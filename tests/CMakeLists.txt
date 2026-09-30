@@ -461,6 +461,7 @@ target_include_directories(test-model-load-memory PRIVATE ${PROJECT_SOURCE_DIR}/
 llama_build_and_test(test-model-load-memory-split.cpp LABEL "model")
 llama_build_and_test(test-autorelease.cpp       LABEL "model")
 llama_build_and_test(test-backend-sampler.cpp   LABEL "model")
+llama_build_and_test(test-laya.cpp)
 
 if (APPLE)
     llama_build(test-rset-release.cpp)

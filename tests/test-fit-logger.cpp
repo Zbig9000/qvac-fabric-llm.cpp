@@ -1,5 +1,6 @@
 #include "../common/fit.h"
 #include "../ggml/src/ggml-impl.h"
+#include "../src/llama-impl.h"
 
 #include <chrono>
 #include <condition_variable>
@@ -15,6 +16,7 @@ struct logger_state {
     bool release_probe = false;
     bool unrelated_info = false;
     bool probe_debug = false;
+    bool probe_llama_debug = false;
     bool restored_info = false;
     bool other_probe_done = false;
 };
@@ -26,6 +28,10 @@ static void log_callback(ggml_log_level level, const char * text, void * data) {
         state.probe_logging = true;
         lock.unlock();
         ggml_log_internal(GGML_LOG_LEVEL_INFO, "probe logging\n");
+#if !defined(_WIN32) || !defined(LLAMA_SHARED)
+        // llama_log_internal is not exported from llama.dll.
+        LLAMA_LOG_INFO("probe llama logging\n");
+#endif
         lock.lock();
         state.changed.notify_all();
         state.changed.wait(lock, [&] { return state.release_probe; });
@@ -35,6 +41,9 @@ static void log_callback(ggml_log_level level, const char * text, void * data) {
     }
     if (std::strcmp(text, "probe logging\n") == 0) {
         state.probe_debug = level == GGML_LOG_LEVEL_DEBUG;
+    }
+    if (std::strcmp(text, "probe llama logging\n") == 0) {
+        state.probe_llama_debug = level == GGML_LOG_LEVEL_DEBUG;
     }
     if (std::strcmp(text, "probe finished\n") == 0) {
         state.restored_info = level == GGML_LOG_LEVEL_INFO;
@@ -89,6 +98,12 @@ int main() {
     const bool restored = callback == log_callback && data == &state;
     llama_log_set(nullptr, nullptr);
 
+#if !defined(_WIN32) || !defined(LLAMA_SHARED)
+    if (!state.probe_llama_debug) {
+        fprintf(stderr, "FAIL probe llama logging was not downgraded\n");
+        return 1;
+    }
+#endif
     if (!entered || !unchanged || !state.unrelated_info || !restored || !state.probe_debug || !state.restored_info || !parallel) {
         fprintf(stderr, "FAIL fit logger: entered=%d unchanged=%d unrelated_info=%d restored=%d probe_debug=%d restored_info=%d parallel=%d\n",
             entered, unchanged, state.unrelated_info, restored, state.probe_debug, state.restored_info, parallel);

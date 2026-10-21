@@ -6215,6 +6215,9 @@ static bool ggml_hexagon_supported_get_rows(const struct ggml_hexagon_session * 
     const struct ggml_tensor * src1 = op->src[1]; // indices
     const struct ggml_tensor * dst  = op;
 
+    if ((src0->type == GGML_TYPE_F16 || src0->type == GGML_TYPE_BF16) &&
+        (src0->nb[0] != sizeof(uint16_t) || dst->nb[0] != sizeof(float))) { return false; }
+
     if (src0->type == GGML_TYPE_Q4_0 && src0->view_src) {
         return false;
     }
@@ -6239,11 +6242,11 @@ static bool ggml_hexagon_supported_get_rows(const struct ggml_hexagon_session * 
         return false;
     }
 
-    if (src0->type != dst->type && src0->ne[0] < 32) {
+    if (src0->type != GGML_TYPE_F16 && src0->type != GGML_TYPE_BF16 && src0->type != dst->type && src0->ne[0] < 32) {
         return false;
     }
 
-    if (src0->type != GGML_TYPE_F32 && src0->type != GGML_TYPE_F16 &&
+    if (src0->type != GGML_TYPE_F32 && src0->type != GGML_TYPE_F16 && src0->type != GGML_TYPE_BF16 &&
         src0->type != GGML_TYPE_Q4_0 && src0->type != GGML_TYPE_Q8_0 && src0->type != GGML_TYPE_I32) {
         return false;
     }

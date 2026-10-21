@@ -16,6 +16,7 @@ struct logger_state {
     bool unrelated_info = false;
     bool probe_debug = false;
     bool restored_info = false;
+    bool other_probe_done = false;
 };
 
 static void log_callback(ggml_log_level level, const char * text, void * data) {
@@ -43,7 +44,7 @@ static void log_callback(ggml_log_level level, const char * text, void * data) {
 int main() {
     logger_state state;
     llama_log_set(log_callback, &state);
-    std::thread probe([] {
+    const auto run_probe = [] {
         auto mparams = llama_model_default_params();
         auto cparams = llama_context_default_params();
         std::vector<ggml_backend_dev_t> devices;
@@ -54,7 +55,8 @@ int main() {
         } catch (const std::exception &) {
         }
         ggml_log_internal(GGML_LOG_LEVEL_INFO, "probe finished\n");
-    });
+    };
+    std::thread probe(run_probe);
 
     bool entered;
     {
@@ -66,19 +68,30 @@ int main() {
     llama_log_get(&callback, &data);
     const bool unchanged = callback == log_callback && data == &state;
     ggml_log_internal(GGML_LOG_LEVEL_INFO, "unrelated logging\n");
+    std::thread other_probe([&] {
+        run_probe();
+        {
+            std::lock_guard<std::mutex> lock(state.mutex);
+            state.other_probe_done = true;
+        }
+        state.changed.notify_all();
+    });
+    bool parallel;
     {
-        std::lock_guard<std::mutex> lock(state.mutex);
+        std::unique_lock<std::mutex> lock(state.mutex);
+        parallel = state.changed.wait_for(lock, std::chrono::seconds(10), [&] { return state.other_probe_done; });
         state.release_probe = true;
     }
     state.changed.notify_all();
     probe.join();
+    other_probe.join();
     llama_log_get(&callback, &data);
     const bool restored = callback == log_callback && data == &state;
     llama_log_set(nullptr, nullptr);
 
-    if (!entered || !unchanged || !state.unrelated_info || !restored || !state.probe_debug || !state.restored_info) {
-        fprintf(stderr, "FAIL fit logger: entered=%d unchanged=%d unrelated_info=%d restored=%d probe_debug=%d restored_info=%d\n",
-            entered, unchanged, state.unrelated_info, restored, state.probe_debug, state.restored_info);
+    if (!entered || !unchanged || !state.unrelated_info || !restored || !state.probe_debug || !state.restored_info || !parallel) {
+        fprintf(stderr, "FAIL fit logger: entered=%d unchanged=%d unrelated_info=%d restored=%d probe_debug=%d restored_info=%d parallel=%d\n",
+            entered, unchanged, state.unrelated_info, restored, state.probe_debug, state.restored_info, parallel);
         return 1;
     }
     return 0;

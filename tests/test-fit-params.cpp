@@ -160,7 +160,7 @@ static void test_probe_logger_restoration() {
     expect_i64("probe does not replace callback", restored_callback == callback, true);
     expect_i64("probe does not replace callback data", restored_data == &inject, true);
     expect_i64("probe restores thread level", ggml_log_get_thread_min_level(), GGML_LOG_LEVEL_NONE);
-    // A second probe verifies that unwinding released the serialization mutex.
+    // A second probe checks that the calling thread remains usable after unwinding.
     try {
         common_get_device_memory_data("/nonexistent-fit-test/model.gguf", &mparams, &cparams, devices,
                                       layers, context, experts, GGML_LOG_LEVEL_ERROR);

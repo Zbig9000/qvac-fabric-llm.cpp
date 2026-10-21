@@ -13,7 +13,6 @@
 #include <stdexcept>
 #include <cinttypes>
 #include <set>
-#include <mutex>
 #include <string>
 #include <vector>
 
@@ -40,8 +39,6 @@ static std::vector<llama_device_memory_data> common_get_device_memory_data_impl(
         uint32_t & hp_n_ctx_train,
         uint32_t & hp_n_expert,
         ggml_log_level log_level) {
-    static std::mutex probe_mutex;
-    const std::lock_guard<std::mutex> lock(probe_mutex);
     struct log_level_scope {
         ggml_log_level previous;
         explicit log_level_scope(ggml_log_level level)

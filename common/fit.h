@@ -24,7 +24,7 @@ struct common_fit_extra_model {
 // fits mparams and cparams to free device memory (assumes system memory is unlimited)
 //   - returns SUCCESS if parameters fit, FAILURE if they cannot fit, or ERROR on a hard error
 //   - restores parameters, tensor split, and null-terminated overrides on FAILURE or ERROR
-//   - fit/memory probes are serialized; log-level filtering affects only the probe thread
+//   - log-level filtering affects only the probe thread
 //   - only parameters that have the same value as in llama_default_model_params are modified
 //     with the exception of the context size which is modified if and only if equal to 0
 common_params_fit_status common_fit_params(

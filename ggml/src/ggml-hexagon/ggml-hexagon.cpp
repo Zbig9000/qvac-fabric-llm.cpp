@@ -4627,6 +4627,10 @@ static bool ggml_hexagon_supported_gated_delta_net(const struct ggml_hexagon_ses
     return true;
 }
 
+static bool mm_weight_pads_partial_tile(ggml_type wtype) {
+    return wtype == GGML_TYPE_F16 || wtype == GGML_TYPE_F32;
+}
+
 static bool ggml_hexagon_matmul_is_hmx_eligible(
     const struct ggml_tensor * src0,
     const struct ggml_tensor * src1,
@@ -4635,17 +4639,31 @@ static bool ggml_hexagon_matmul_is_hmx_eligible(
     bool is_matmul_id,
     bool is_batched
 ) {
-    if (src1->type != GGML_TYPE_F32) {
-        return false;
-    }
 
     const int ne00  = src0->ne[0];
+    const int ne01  = src0->ne[1];
     const int ne11  = src1->ne[1];
     const int ne12  = src1->ne[2];
     const int wtype = src0->type;
 
-    // HMX weight tile requires N to be 32-aligned.
-    if (ne01_padded % 32 != 0) {
+    // The 2D HMX path tiles F16 activations of F16 weights (im2col GEMMs); the
+    // batched and MUL_MAT_ID paths convert F32 activations only.
+    const bool f16_gemm_2d = src1->type == GGML_TYPE_F16 && wtype == GGML_TYPE_F16 && !is_batched && !is_matmul_id;
+    if (src1->type != GGML_TYPE_F32 && !f16_gemm_2d) {
+        return false;
+    }
+
+    // HMX multiplies in F16; a product that asks for F32 precision stays on HVX.
+    if (dst->op == GGML_OP_MUL_MAT && ggml_get_op_params_i32(dst, 0) == GGML_PREC_F32) {
+        return false;
+    }
+
+    // HMX weight tiles are 32 rows of N. The 2D path pads a partial F16 or
+    // F32 tile and clips its output columns; quantized repacked weights and
+    // the batched paths still need the true ne01 32-aligned (the Parakeet CTC
+    // head has ne01=1025), which ne01_padded alone cannot tell apart.
+    const bool pads_partial_tile = mm_weight_pads_partial_tile((ggml_type) wtype) && !is_batched && !is_matmul_id;
+    if (ne01_padded % HTP_MM_HMX_TILE_N_COLS != 0 || (ne01 % HTP_MM_HMX_TILE_N_COLS != 0 && !pads_partial_tile)) {
         return false;
     }
 
@@ -4677,8 +4695,6 @@ static bool ggml_hexagon_matmul_is_hmx_eligible(
     }
 
     return true;
-
-    GGML_UNUSED(dst);
 }
 
 static bool ggml_hexagon_precompute_hmx_mm_params(
@@ -4865,6 +4881,19 @@ static void ggml_hexagon_precompute_hvx_mm_params(
 
     done_quant:;
     } else if (wtype == GGML_TYPE_F16) {
+        // The first 3x3 convolution has thousands of K=9 im2col rows.
+        // Vectorize across these rows instead of reducing a mostly empty
+        // vector per dot product. Keep batching, views and fused adds on the
+        // existing paths; this kernel needs no VTCM allocation.
+        if (sess->mdev.count == 1 && !is_matmul_id && src2_row_size == 0 && ne10 == 9 &&
+            src0->ne[0] == 9 && src0->ne[1] >= 64 && ne11 >= 4 &&
+            ne02 == 1 && ne03 == 1 && ne12 == 1 && ne13 == 1 &&
+            src1->type == GGML_TYPE_F16 && dst->type == GGML_TYPE_F32 &&
+            ggml_is_contiguous(src0) && ggml_is_contiguous(src1) && ggml_is_contiguous(dst)) {
+            kparams->kernel_type = HTP_MM_KERNEL_HVX_F16_F16_K9;
+            return;
+        }
+
         // F16 HVX
         struct htp_mm_hvx_vtcm_layout L;
         uint32_t m_chunk = 0;
@@ -4935,7 +4964,7 @@ static void ggml_hexagon_precompute_matmul_params_impl(
     const int wtype = src0->type;
     const bool is_repack = ggml_hexagon_is_repack_type((ggml_type) wtype);
     const int ne00_padded = is_repack ? hex_round_up(ne00, 32) : ne00;
-    const int ne01_padded = is_repack ? hex_round_up(ne01, 32) : ne01;
+    const int ne01_padded = (is_repack || mm_weight_pads_partial_tile((ggml_type) wtype)) ? hex_round_up(ne01, HTP_MM_HMX_TILE_N_COLS) : ne01;
     const int ne11_padded = hex_round_up(ne11, 32);
 
     const bool is_matmul_id = (dst->op == GGML_OP_MUL_MAT_ID);
@@ -6797,7 +6826,7 @@ static bool mm_is_hmx_eligible(const ggml_tensor * t) {
     const bool is_matmul_id = (t->op == GGML_OP_MUL_MAT_ID);
     const bool is_batched   = (src0->ne[2] * src0->ne[3] > 1 || src1->ne[2] * src1->ne[3] > 1);
 
-    const int ne01_padded = is_repack ? hex_round_up(src0->ne[1], 32) : src0->ne[1];
+    const int ne01_padded = (is_repack || mm_weight_pads_partial_tile((ggml_type) wtype)) ? hex_round_up(src0->ne[1], HTP_MM_HMX_TILE_N_COLS) : src0->ne[1];
 
     return ggml_hexagon_matmul_is_hmx_eligible(src0, src1, t, ne01_padded, is_matmul_id, is_batched);
 }

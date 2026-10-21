@@ -59,6 +59,7 @@ extern "C" {
 
 enum htp_mm_kernel_type {
     HTP_MM_KERNEL_UNSUPPORTED = 0,
+    HTP_MM_KERNEL_HVX_F16_F16_K9,
 
     // HMX paths
     HTP_MM_KERNEL_HMX_2D,

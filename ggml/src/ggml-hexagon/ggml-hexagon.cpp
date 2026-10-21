@@ -4350,8 +4350,8 @@ static bool ggml_hexagon_flash_attn_is_hmx_eligible(
         return false;
     }
 
-    if ((k->type != GGML_TYPE_F16 && k->type != GGML_TYPE_Q8_0) ||
-        (v->type != GGML_TYPE_F16 && v->type != GGML_TYPE_Q8_0)) {
+    if ((k->type != GGML_TYPE_F16 && k->type != GGML_TYPE_Q8_0 && k->type != GGML_TYPE_F32) ||
+        (v->type != GGML_TYPE_F16 && v->type != GGML_TYPE_Q8_0 && v->type != GGML_TYPE_F32)) {
         return false;
     }
 
@@ -4422,6 +4422,8 @@ static bool ggml_hexagon_precompute_flash_attn_params(
     kparams->logit_softcap = logit_softcap;
 
     kparams->is_q_fp32 = (q->type == GGML_TYPE_F32) ? 1 : 0;
+    kparams->is_k_fp32 = (k->type == GGML_TYPE_F32) ? 1 : 0;
+    kparams->is_v_fp32 = (v->type == GGML_TYPE_F32) ? 1 : 0;
     kparams->is_dst_fp32 = (dst->type == GGML_TYPE_F32) ? 1 : 0;
     kparams->G = G;
 
@@ -4439,9 +4441,12 @@ static bool ggml_hexagon_precompute_flash_attn_params(
         const uint32_t DK_pad = hex_round_up(DK, 64);
         const uint32_t DV_pad = hex_round_up(DV, 64);
         size_t Br = 0, Bc = 0;
-        int ret = hmx_fa_find_chunk_size(&Br, &Bc, G, DK_pad, DV_pad, neq1, nek1, sess->vtcm_size, sess->n_threads, kparams->is_q_fp32 != 0, sinks != nullptr, n_head);
+        int ret = hmx_fa_find_chunk_size(&Br, &Bc, G, DK_pad, DV_pad, neq1, nek1, sess->vtcm_size, sess->n_threads, kparams->is_q_fp32 != 0, kparams->is_k_fp32 != 0, kparams->is_v_fp32 != 0, sinks != nullptr, n_head);
         if (ret == 0) {
             kparams->kernel_type = HTP_FA_KERNEL_HMX;
+            HEX_VERBOSE("ggml-hex: FA kernel=HMX G=%u DK=%u DV=%u neq1=%u nek1=%u Br=%zu Bc=%zu k_fp32=%d v_fp32=%d\n",
+                        (unsigned) G, (unsigned) DK, (unsigned) DV, (unsigned) neq1, (unsigned) nek1,
+                        Br, Bc, (int) kparams->is_k_fp32, (int) kparams->is_v_fp32);
             kparams->Br = Br;
             kparams->Bc = Bc;
             kparams->n_kv_blocks = (nek1 + Bc - 1) / Bc;
@@ -4449,7 +4454,7 @@ static bool ggml_hexagon_precompute_flash_attn_params(
 
             kparams->u.hmx.g_br = hex_align_up(G * Br, 32);
             kparams->u.hmx.pipeline = (kparams->n_kv_blocks >= 3 && sess->n_threads >= 2) ? 1 : 0;
-            kparams->vtcm_size = hmx_fa_compute_vtcm_usage(G, DK_pad, DV_pad, Br, Bc, kparams->n_threads, kparams->u.hmx.pipeline != 0, kparams->is_q_fp32 != 0, sinks != nullptr, n_head);
+            kparams->vtcm_size = hmx_fa_compute_vtcm_usage(G, DK_pad, DV_pad, Br, Bc, kparams->n_threads, kparams->u.hmx.pipeline != 0, kparams->is_q_fp32 != 0, kparams->is_k_fp32 != 0, kparams->is_v_fp32 != 0, sinks != nullptr, n_head);
 
             const size_t row_vec_bytes = hex_align_up(Bc * sizeof(uint16_t), 256);
             kparams->u.hmx.row_buf_stride = row_vec_bytes / 128; // HVX vector is 128 bytes
@@ -4471,16 +4476,19 @@ static bool ggml_hexagon_precompute_flash_attn_params(
 
     // Fallback to HVX
     kparams->kernel_type = HTP_FA_KERNEL_HVX;
+    HEX_VERBOSE("ggml-hex: FA kernel=HVX DK=%u DV=%u neq1=%u nek1=%u k_fp32=%d v_fp32=%d\n",
+                (unsigned) DK, (unsigned) DV, (unsigned) neq1, (unsigned) nek1,
+                (int) kparams->is_k_fp32, (int) kparams->is_v_fp32);
     kparams->Br = 1;
     kparams->Bc = 64; // FLASH_ATTN_BLOCK_SIZE
     kparams->n_kv_blocks = (k->ne[1] + 64 - 1) / 64;
     kparams->n_threads = sess->n_threads;
 
     const size_t size_q_row_padded = hex_round_up(q->ne[0] * (kparams->is_q_fp32 ? 4 : 2), 128);
-    const size_t size_k_row_padded = hex_round_up(k->ne[0] * 2, 128);
-    const size_t size_v_row_padded = hex_round_up(v->ne[0] * 2, 128);
+    const size_t size_k_row_padded = hex_round_up(k->ne[0] * (kparams->is_k_fp32 ? 4 : 2), 128);
+    const size_t size_v_row_padded = hex_round_up(v->ne[0] * (kparams->is_v_fp32 ? 4 : 2), 128);
 
-    kparams->vtcm_size = hvx_fa_compute_vtcm_usage(DK, DV, kparams->is_q_fp32 != 0, mask != nullptr, sinks != nullptr, n_head, sess->n_threads);
+    kparams->vtcm_size = hvx_fa_compute_vtcm_usage(DK, DV, kparams->is_q_fp32 != 0, kparams->is_k_fp32 != 0, kparams->is_v_fp32 != 0, mask != nullptr, sinks != nullptr, n_head, sess->n_threads);
 
     kparams->u.hvx.size_q_row_padded = size_q_row_padded;
     kparams->u.hvx.size_k_row_padded = size_k_row_padded;
@@ -4512,8 +4520,8 @@ static bool ggml_hexagon_supported_flash_attn_ext(const struct ggml_hexagon_sess
 
     // Check for F16/Q8_0 support
     if ((src0->type != GGML_TYPE_F16 && src0->type != GGML_TYPE_F32) ||
-        (src1->type != GGML_TYPE_F16 && src1->type != GGML_TYPE_Q8_0) ||
-        (src2->type != GGML_TYPE_F16 && src2->type != GGML_TYPE_Q8_0)) {
+        (src1->type != GGML_TYPE_F16 && src1->type != GGML_TYPE_Q8_0 && src1->type != GGML_TYPE_F32) ||
+        (src2->type != GGML_TYPE_F16 && src2->type != GGML_TYPE_Q8_0 && src2->type != GGML_TYPE_F32)) {
         return false;
     }
 

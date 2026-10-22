@@ -22,6 +22,7 @@ MANAGED_ENV_NAMES = (
     "GGML_HEXAGON_NHMX",
     "GGML_HEXAGON_HOSTBUF",
     "GGML_HEXAGON_DMA64",
+    "GGML_HEXAGON_BF16",
     "GGML_HEXAGON_OPBATCH",
     "GGML_HEXAGON_OPQUEUE",
     "GGML_HEXAGON_OPPOLL",
@@ -157,6 +158,7 @@ def main():
     parser.add_argument("--hex-nhvx", help="Number of HVX units to use (GGML_HEXAGON_NHVX)")
     parser.add_argument("--hex-nhmx", help="Number of HMX units to use. 0 disables HMX power-up (GGML_HEXAGON_NHMX)")
     parser.add_argument("--hex-hostbuf", help="Enable host buffers (GGML_HEXAGON_HOSTBUF)")
+    parser.add_argument("--hex-bf16", choices=("0", "1"), help="Enable BF16 weights with cached F16 mirrors (GGML_HEXAGON_BF16, default: 1)")
     parser.add_argument("--hex-dma64", nargs="?", const="1", help="Enable (1) or disable (0) 64-bit DMA for model weights (GGML_HEXAGON_DMA64)")
     parser.add_argument("--hex-opbatch", help="Maximum number of operations to batch into a single HTP execution (GGML_HEXAGON_OPBATCH)")
     parser.add_argument("--hex-opqueue", help="Size of the asynchronous NPU operation queue (GGML_HEXAGON_OPQUEUE)")
@@ -298,6 +300,7 @@ def main():
     set_env("GGML_HEXAGON_NHVX", args.hex_nhvx)
     set_env("GGML_HEXAGON_NHMX", args.hex_nhmx)
     set_env("GGML_HEXAGON_HOSTBUF", args.hex_hostbuf)
+    set_env("GGML_HEXAGON_BF16", args.hex_bf16)
     set_env("GGML_HEXAGON_DMA64", args.hex_dma64)
     set_env("GGML_HEXAGON_OPBATCH", args.hex_opbatch)
     set_env("GGML_HEXAGON_OPQUEUE", args.hex_opqueue)

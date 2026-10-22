@@ -6945,12 +6945,10 @@ static bool is_depthwise_conv_1d(const ggml_tensor * im2col, const ggml_tensor *
 
 static bool depthwise_conv_1d_fits(const ggml_hexagon_session * sess, const ggml_tensor * im2col, const ggml_tensor * mm) {
     const int32_t * p        = (const int32_t *) im2col->op_params;
-    const uint64_t out_pitch = ((uint64_t) mm->ne[0] + HTP_DW1D_LANES - 1) / HTP_DW1D_LANES * HTP_DW1D_LANES;
-    const uint64_t reach = out_pitch + (uint64_t) (mm->src[1]->ne[0] - 1) * p[4];
-    const uint64_t staged = (uint64_t) p[2] + im2col->src[1]->ne[0];
-    const uint64_t in_pitch = (std::max(reach, staged) + HTP_DW1D_LANES - 1) / HTP_DW1D_LANES * HTP_DW1D_LANES;
+    const uint64_t out_pitch = htp_dw1d_round_up(mm->ne[0]);
+    const uint64_t in_pitch = htp_dw1d_in_pitch(mm->ne[0], mm->src[1]->ne[0], p[4], p[2], im2col->src[1]->ne[0]);
     return in_pitch <= UINT32_MAX && out_pitch <= UINT32_MAX &&
-           in_pitch + out_pitch <= sess->vtcm_size / sizeof(float) / mm->ne[2];
+           htp_dw1d_vtcm_bytes(mm->ne[2], in_pitch, out_pitch) <= sess->vtcm_size;
 }
 
 static bool can_fuse_depthwise_conv_1d(const ggml_hexagon_session * sess, const ggml_cgraph * graph, int i) {

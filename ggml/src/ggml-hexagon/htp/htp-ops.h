@@ -270,23 +270,28 @@ struct htp_opbatch_rsp {
     // struct htp_prof_desc profs[];  -- dspqueue buf 0
 };
 
-// Fused depthwise 1D convolution: VTCM row pitch (floats) that holds one
-// zero-padded input channel and every tap read of the 32-wide output vectors.
 #define HTP_DW1D_LANES 32
 
-static inline uint32_t htp_dw1d_round_up(uint32_t n) {
+static inline uint64_t htp_dw1d_round_up(uint64_t n) {
     return (n + HTP_DW1D_LANES - 1) / HTP_DW1D_LANES * HTP_DW1D_LANES;
 }
 
-static inline uint32_t htp_dw1d_in_pitch(uint32_t out_len, uint32_t taps, uint32_t dilation, uint32_t pad,
+static inline uint64_t htp_dw1d_in_pitch(uint32_t out_len, uint32_t taps, uint32_t dilation, uint32_t pad,
                                          uint32_t in_len) {
-    const uint32_t reach  = htp_dw1d_round_up(out_len) + (taps - 1) * dilation;
-    const uint32_t staged = pad + in_len;
+    const uint64_t reach  = htp_dw1d_round_up(out_len) + (uint64_t) (taps - 1) * dilation;
+    const uint64_t staged = (uint64_t) pad + in_len;
     return htp_dw1d_round_up(reach > staged ? reach : staged);
 }
 
-static inline size_t htp_dw1d_vtcm_bytes(uint32_t channels, uint32_t in_pitch, uint32_t out_pitch) {
-    return (size_t) channels * (in_pitch + out_pitch) * sizeof(float);
+static inline size_t htp_dw1d_vtcm_bytes(uint32_t channels, uint64_t in_pitch, uint64_t out_pitch) {
+    if (in_pitch > SIZE_MAX || out_pitch > SIZE_MAX - in_pitch) {
+        return SIZE_MAX;
+    }
+    const size_t pitch = in_pitch + out_pitch;
+    if (pitch > SIZE_MAX / sizeof(float) || (pitch && channels > SIZE_MAX / sizeof(float) / pitch)) {
+        return SIZE_MAX;
+    }
+    return (size_t) channels * pitch * sizeof(float);
 }
 
 #endif /* HTP_OPS_H */

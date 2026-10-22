@@ -92,13 +92,15 @@ int op_depthwise_conv_1d(struct htp_ops_context * octx) {
         .dilation = octx->op_params[4],
         .pad      = octx->op_params[2],
     };
-    c.in_pitch  = htp_dw1d_in_pitch(dst->ne[0], c.taps, c.dilation, c.pad, x->ne[0]);
-    c.out_pitch = hex_round_up(dst->ne[0], VLEN_FP32);
-
+    const uint64_t in_pitch = htp_dw1d_in_pitch(dst->ne[0], c.taps, c.dilation, c.pad, x->ne[0]);
+    const uint64_t out_pitch = htp_dw1d_round_up(dst->ne[0]);
     const uint32_t C = dst->ne[2];
-    if (htp_dw1d_vtcm_bytes(C, c.in_pitch, c.out_pitch) > octx->ctx->vtcm_size) {
+    if (in_pitch > UINT32_MAX || out_pitch > UINT32_MAX ||
+        htp_dw1d_vtcm_bytes(C, in_pitch, out_pitch) > octx->ctx->vtcm_size) {
         return HTP_STATUS_VTCM_TOO_SMALL;
     }
+    c.in_pitch = in_pitch;
+    c.out_pitch = out_pitch;
     c.in  = (float *) octx->ctx->vtcm_base;
     c.out = c.in + (size_t) C * c.in_pitch;
 

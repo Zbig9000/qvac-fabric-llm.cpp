@@ -442,64 +442,33 @@ static inline void cpy_dma_sametype_sameshape(
     dma_queue_flush(dma_q);
 }
 
-static void cpy_thread_f32_f16_strided(unsigned int nth, unsigned int ith, void * data) {
-    struct htp_copy_context * ct = (struct htp_copy_context *) data;
-    struct htp_ops_context * octx = ct->octx;
-    cpy_preamble;
-
-    const uint32_t dr  = ct->src0_nrows_per_thread;
-    const uint32_t ir0 = dr * ith;
-    const uint32_t ir1 = MIN(ir0 + dr, ne01);
-    if (ir0 >= ne01) return;
-
-    for (uint32_t i03 = 0; i03 < ne03; i03++) {
-        for (uint32_t i02 = 0; i02 < ne02; i02++) {
-            for (uint32_t i01 = ir0; i01 < ir1; i01++) {
-                for (uint32_t i00 = 0; i00 < ne00; i00++) {
-                    const uint8_t * src_ptr = (const uint8_t *) src0->data +
-                                              i00*nb00 + i01*nb01 + i02*nb02 + i03*nb03;
-                    uint8_t *       dst_ptr = (uint8_t *) dst->data +
-                                              i00*nb0  + i01*nb1  + i02*nb2  + i03*nb3;
-                    float  x;
-                    memcpy(&x, src_ptr, sizeof(float));
-                    __fp16 y = (__fp16) x;
-                    memcpy(dst_ptr, &y, sizeof(__fp16));
-                }
-            }
-        }
-    }
+#define DEFINE_CPY_STRIDED(NAME, SRC_TYPE, DST_TYPE) \
+static void cpy_thread_##NAME##_strided(unsigned int nth, unsigned int ith, void * data) { \
+    struct htp_copy_context * ct = (struct htp_copy_context *) data; \
+    struct htp_ops_context * octx = ct->octx; \
+    cpy_preamble; \
+    const uint32_t total_rows = ne01 * ne02 * ne03; \
+    const uint32_t first = ct->src0_nrows_per_thread * ith; \
+    const uint32_t end = MIN(first + ct->src0_nrows_per_thread, total_rows); \
+    for (uint32_t row = first; row < end; ++row) { \
+        const uint32_t i01 = row % ne01; \
+        const uint32_t i02 = (row / ne01) % ne02; \
+        const uint32_t i03 = row / (ne01 * ne02); \
+        for (uint32_t i00 = 0; i00 < ne00; ++i00) { \
+            const uint8_t * src_ptr = (const uint8_t *) src0->data + \
+                                      i00*nb00 + i01*nb01 + i02*nb02 + i03*nb03; \
+            uint8_t * dst_ptr = (uint8_t *) dst->data + i00*nb0 + i01*nb1 + i02*nb2 + i03*nb3; \
+            SRC_TYPE x; \
+            memcpy(&x, src_ptr, sizeof(x)); \
+            DST_TYPE y = (DST_TYPE) x; \
+            memcpy(dst_ptr, &y, sizeof(y)); \
+        } \
+    } \
 }
 
-// Mirror of cpy_thread_f32_f16_strided for the reverse conversion. Same
-// rationale — used when the graph produces a strided f16 source that must
-// be materialised as f32 (post-attention CONT+cast patterns).
-static void cpy_thread_f16_f32_strided(unsigned int nth, unsigned int ith, void * data) {
-    struct htp_copy_context * ct = (struct htp_copy_context *) data;
-    struct htp_ops_context * octx = ct->octx;
-    cpy_preamble;
-
-    const uint32_t dr  = ct->src0_nrows_per_thread;
-    const uint32_t ir0 = dr * ith;
-    const uint32_t ir1 = MIN(ir0 + dr, ne01);
-    if (ir0 >= ne01) return;
-
-    for (uint32_t i03 = 0; i03 < ne03; i03++) {
-        for (uint32_t i02 = 0; i02 < ne02; i02++) {
-            for (uint32_t i01 = ir0; i01 < ir1; i01++) {
-                for (uint32_t i00 = 0; i00 < ne00; i00++) {
-                    const uint8_t * src_ptr = (const uint8_t *) src0->data +
-                                              i00*nb00 + i01*nb01 + i02*nb02 + i03*nb03;
-                    uint8_t *       dst_ptr = (uint8_t *) dst->data +
-                                              i00*nb0  + i01*nb1  + i02*nb2  + i03*nb3;
-                    __fp16 y;
-                    memcpy(&y, src_ptr, sizeof(__fp16));
-                    float  x = (float) y;
-                    memcpy(dst_ptr, &x, sizeof(float));
-                }
-            }
-        }
-    }
-}
+DEFINE_CPY_STRIDED(f32_f16, float, __fp16)
+DEFINE_CPY_STRIDED(f16_f32, __fp16, float)
+#undef DEFINE_CPY_STRIDED
 
 static bool cpy_dst_is_contiguous(const struct htp_tensor * dst, uint32_t elem_size) {
     return dst->nb[0] == elem_size && dst->nb[1] == dst->ne[0] * dst->nb[0] && dst->nb[2] == dst->ne[1] * dst->nb[1] &&
@@ -599,7 +568,7 @@ static int exec_cpy(struct htp_ops_context * octx, bool * use_dma) {
         if (cpy_run_transpose(octx)) { return HTP_STATUS_OK; }
         if (ne00 == ne0 && ne01 == ne1 && ne02 == ne2 && ne03 == ne3 &&
             (nb00 != ct.src0_type_size || nb0 != ct.dst_type_size) && src0->type != dst->type) {
-            ct.src0_nrows_per_thread = (ne01 + octx->n_threads - 1) / octx->n_threads;
+            ct.src0_nrows_per_thread = (ne01 * ne02 * ne03 + octx->n_threads - 1) / octx->n_threads;
             if (src0->type == HTP_TYPE_F32 && dst->type == HTP_TYPE_F16) {
                 work_queue_run(octx->ctx->work_queue, cpy_thread_f32_f16_strided, &ct, octx->n_threads);
                 return HTP_STATUS_OK;

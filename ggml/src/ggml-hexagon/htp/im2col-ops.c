@@ -18,6 +18,7 @@
 #include "hex-profile.h"
 #include "htp-vtcm.h"
 #include "htp-tensor.h"
+#include "htp-dma-reader.h"
 
 struct htp_im2col_context {
     struct htp_ops_context * octx;
@@ -94,6 +95,8 @@ static inline void htp_im2col_vtcm_layout_build(struct htp_im2col_vtcm_layout * 
         if (patch_start >= patch_stop) {                                                                   \
             return;                                                                                        \
         }                                                                                                  \
+        struct htp_dma_reader reader = htp_dma_reader_init(src1, octx->ctx->dma[ith],                       \
+            octx->ctx->vtcm_base + ith * HTP_DMA_READER_BYTES);                                             \
         htp_trace_event_start(tr, HTP_TRACE_EVT_HVX_COMP, patch_start);                                    \
         for (uint32_t p = patch_start; p < patch_stop; p++) {                                              \
             const uint32_t iow             = p % OW;                                                       \
@@ -111,6 +114,19 @@ static inline void htp_im2col_vtcm_layout_build(struct htp_im2col_vtcm_layout * 
                         continue;                                                                         \
                     }                                                                                     \
                     const int64_t iiw0             = (int64_t) iow * s0 - p0;                             \
+                    if (htp_tensor_is_extended(src1)) {                                                     \
+                        for (uint32_t ikw = 0; ikw < KW; ++ikw) {                                           \
+                            const int64_t iiw = iiw0 + (int64_t) ikw * d0;                                  \
+                            float value = 0.0f;                                                             \
+                            if (iiw >= 0 && iiw < IW) {                                                     \
+                                const uint32_t offset = in * src1->nb[is_2D ? 3 : 2] +                      \
+                                    iic * src1->nb[is_2D ? 2 : 1] + iih * src1->nb[1] + iiw * src1->nb[0];  \
+                                value = *(const float *) htp_dma_reader_view(&reader, offset, sizeof(float));\
+                            }                                                                                                  \
+                            out_run[ikw] = (DST_CTYPE) value;                                               \
+                        }                                                                                        \
+                        continue;                                                                                              \
+                    }                                                                                            \
                     if (d0 == 1) {                                                                        \
                         /* contiguous source run: [lo,hi) is in-bounds, tails are zero pad */             \
                         const int64_t lo = iiw0 < 0 ? -iiw0 : 0;                                          \
@@ -835,8 +851,11 @@ int op_im2col(struct htp_ops_context * octx) {
         return HTP_STATUS_OK;
     }
 
-    if (htp_tensor_is_extended(src1) || htp_tensor_is_extended(dst)) {
+    if (htp_tensor_is_extended(dst)) {
         return HTP_STATUS_NO_SUPPORT;
+    }
+    if ((size_t) n_threads * HTP_DMA_READER_BYTES > octx->ctx->vtcm_size) {
+        return HTP_STATUS_VTCM_TOO_SMALL;
     }
 
     if (dst->type == HTP_TYPE_F16) {

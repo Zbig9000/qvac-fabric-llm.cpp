@@ -25,6 +25,8 @@ struct htp_dw1d_context {
     uint32_t                  channels_per_thread;
     float *                   in;
     float *                   out;
+    float *                   weights;
+    uint32_t                  weight_pitch;
 };
 
 static void dw1d_channel_range(const struct htp_dw1d_context * c, unsigned int ith, uint32_t * first, uint32_t * count) {
@@ -41,11 +43,14 @@ static void dw1d_stage_thread(unsigned int nth, unsigned int ith, void * data) {
         return;
     }
     float *         in  = c->in + (size_t) c0 * c->in_pitch;
-    const uint8_t * src = (const uint8_t *) c->x->data + (size_t) c0 * c->x->nb[2];
+    dma_addr_t      src = c->x->data + (dma_addr_t) c0 * c->x->nb[2];
     dma_queue *     q   = c->octx->ctx->dma[ith];
     hvx_splat_f32_a(in, 0.0f, nc * c->in_pitch);
     dma_queue_copy_rows(q, dma_make_data(in + c->pad, src), c->in_pitch * sizeof(float), c->x->nb[2],
                         c->x->ne[0] * sizeof(float), nc);
+    dma_queue_copy_rows(q, dma_make_data(c->weights + (size_t) c0 * c->weight_pitch,
+                        c->w->data + (dma_addr_t) c0 * c->w->nb[2]),
+                        c->weight_pitch * sizeof(float), c->w->nb[2], c->taps * sizeof(float), nc);
 }
 
 static void dw1d_row(const struct htp_dw1d_context * c, float * out, const float * in, const float * w,
@@ -69,7 +74,7 @@ static void dw1d_compute_thread(unsigned int nth, unsigned int ith, void * data)
         return;
     }
     for (uint32_t i = c0; i < c0 + nc; i++) {
-        const float * w = (const float *) ((const uint8_t *) c->w->data + (size_t) i * c->w->nb[2]);
+        const float * w = c->weights + (size_t) i * c->weight_pitch;
         dw1d_row(c, c->out + (size_t) i * c->out_pitch, c->in + (size_t) i * c->in_pitch, w, dst->ne[0]);
     }
     dma_queue * q        = c->octx->ctx->dma[ith];
@@ -96,13 +101,15 @@ int op_depthwise_conv_1d(struct htp_ops_context * octx) {
     const uint64_t out_pitch = htp_dw1d_round_up(dst->ne[0]);
     const uint32_t C = dst->ne[2];
     if (in_pitch > UINT32_MAX || out_pitch > UINT32_MAX ||
-        htp_dw1d_vtcm_bytes(C, in_pitch, out_pitch) > octx->ctx->vtcm_size) {
+        htp_dw1d_vtcm_bytes(C, in_pitch, out_pitch, c.taps) > octx->ctx->vtcm_size) {
         return HTP_STATUS_VTCM_TOO_SMALL;
     }
     c.in_pitch = in_pitch;
     c.out_pitch = out_pitch;
     c.in  = (float *) octx->ctx->vtcm_base;
     c.out = c.in + (size_t) C * c.in_pitch;
+    c.weights = c.out + (size_t) C * c.out_pitch;
+    c.weight_pitch = htp_dw1d_round_up(c.taps);
 
     const uint32_t n_threads = MIN(octx->n_threads, C);
     c.channels_per_thread    = (C + n_threads - 1) / n_threads;

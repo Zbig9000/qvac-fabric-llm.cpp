@@ -7,6 +7,7 @@
 #include "ggml-common.h"
 #include "htp-ctx.h"
 #include "htp-ops.h"
+#include "htp-dma-reader.h"
 
 struct htp_timestep_embedding_context {
     struct htp_ops_context * octx;
@@ -15,12 +16,9 @@ struct htp_timestep_embedding_context {
     float                    log_max_period;
 };
 
-// Same arithmetic order as the CPU reference, so the argument rounds identically.
-static void timestep_embedding_row(const struct htp_timestep_embedding_context * tctx, uint32_t row) {
-    const struct htp_tensor * src = tctx->octx->src[0];
+static void timestep_embedding_row(const struct htp_timestep_embedding_context * tctx, uint32_t row, float timestep) {
     const struct htp_tensor * dst = tctx->octx->dst;
 
-    const float timestep = *(const float *) ((const uint8_t *) src->data + row * src->nb[0]);
     float *     embed    = (float *) ((uint8_t *) dst->data + row * dst->nb[1]);
 
     for (uint32_t j = 0; j < tctx->half; j++) {
@@ -41,8 +39,11 @@ static void timestep_embedding_thread(unsigned int nth, unsigned int ith, void *
     const uint32_t start = tctx->rows_per_thread * ith;
     const uint32_t end   = MIN(start + tctx->rows_per_thread, rows);
 
+    struct htp_dma_reader reader = htp_dma_reader_init(tctx->octx->src[0], tctx->octx->ctx->dma[ith],
+        tctx->octx->ctx->vtcm_base + ith * HTP_DMA_READER_BYTES);
     for (uint32_t row = start; row < end; row++) {
-        timestep_embedding_row(tctx, row);
+        const float timestep = *(const float *) htp_dma_reader_view(&reader, row * sizeof(float), sizeof(float));
+        timestep_embedding_row(tctx, row, timestep);
     }
 }
 
@@ -66,6 +67,9 @@ int op_timestep_embedding(struct htp_ops_context * octx) {
         return HTP_STATUS_OK;
     }
 
+    if ((size_t) threads * HTP_DMA_READER_BYTES > octx->ctx->vtcm_size) {
+        return HTP_STATUS_VTCM_TOO_SMALL;
+    }
     struct htp_timestep_embedding_context tctx = {
         .octx            = octx,
         .half            = (uint32_t) dim / 2,

@@ -505,13 +505,88 @@ static bool cpy_run_transpose(struct htp_ops_context * octx) {
     return htp_transpose_f32(&job);
 }
 
+enum { CPY_DMA_TILE_ELEMENTS = 256, CPY_DMA_TILE_BYTES = CPY_DMA_TILE_ELEMENTS * sizeof(float) };
+
+static uint32_t cpy_element_offset(const struct htp_tensor * tensor, uint32_t index) {
+    uint32_t offset = 0;
+    for (uint32_t dim = 0; dim < HTP_OP_MAX_DIMS; ++dim) {
+        offset += index % tensor->ne[dim] * tensor->nb[dim];
+        index /= tensor->ne[dim];
+    }
+    return offset;
+}
+
+static void cpy_convert_tile(void * out, const void * in, uint32_t count, uint32_t src_type, uint32_t dst_type) {
+    if (src_type == HTP_TYPE_F32 && dst_type == HTP_TYPE_F16) {
+        hvx_copy_f16_f32_uu(out, in, count);
+    } else if (src_type == HTP_TYPE_F16 && dst_type == HTP_TYPE_F32) {
+        hvx_copy_f32_f16_uu(out, in, count);
+    } else {
+        for (uint32_t i = 0; i < count; ++i) {
+            if (src_type == HTP_TYPE_F32) {
+                ((int32_t *) out)[i] = (int32_t) ((const float *) in)[i];
+            } else {
+                ((float *) out)[i] = (float) ((const int32_t *) in)[i];
+            }
+        }
+    }
+}
+
+static void cpy_dma_convert_thread(unsigned int nth, unsigned int ith, void * data) {
+    const struct htp_ops_context * octx = data;
+    const struct htp_tensor * src = octx->src[0];
+    const struct htp_tensor * dst = octx->dst;
+    const uint32_t src_size = src->type == HTP_TYPE_F16 ? sizeof(__fp16) : sizeof(float);
+    const uint32_t dst_size = dst->type == HTP_TYPE_F16 ? sizeof(__fp16) : sizeof(float);
+    const uint32_t total = src->ne[0] * src->ne[1] * src->ne[2] * src->ne[3];
+    const uint32_t end = (uint64_t) total * (ith + 1) / nth;
+    uint32_t index = (uint64_t) total * ith / nth;
+    uint8_t * in = octx->ctx->vtcm_base + ith * 2 * CPY_DMA_TILE_BYTES;
+    uint8_t * out = in + CPY_DMA_TILE_BYTES;
+    dma_queue * q = octx->ctx->dma[ith];
+    while (index < end) {
+        const uint32_t count = MIN(CPY_DMA_TILE_ELEMENTS,
+            MIN(end - index, MIN(src->ne[0] - index % src->ne[0], dst->ne[0] - index % dst->ne[0])));
+        dma_queue_copy_rows(q, dma_make_data(in, src->data + cpy_element_offset(src, index)),
+                            src_size, src->nb[0], src_size, count);
+        cpy_convert_tile(out, in, count, src->type, dst->type);
+        dma_queue_copy_rows(q, dma_make_data(dst->data + cpy_element_offset(dst, index), out),
+                            dst->nb[0], dst_size, dst_size, count);
+        index += count;
+    }
+}
+
+static int cpy_dma_convert(struct htp_ops_context * octx) {
+    const uint32_t src_type = octx->src[0]->type;
+    const uint32_t dst_type = octx->dst->type;
+    if (!((src_type == HTP_TYPE_F32 && (dst_type == HTP_TYPE_F16 || dst_type == HTP_TYPE_I32)) ||
+          (dst_type == HTP_TYPE_F32 && (src_type == HTP_TYPE_F16 || src_type == HTP_TYPE_I32)))) {
+        return HTP_STATUS_NO_SUPPORT;
+    }
+    if ((size_t) octx->n_threads * 2 * CPY_DMA_TILE_BYTES > octx->ctx->vtcm_size) {
+        return HTP_STATUS_VTCM_TOO_SMALL;
+    }
+    htp_tensor_flush_all(octx->ctx, octx->dsts, HTP_OP_MAX_OUTPUTS);
+    htp_mdev_group_barrier(octx);
+    if (octx->ctx->mdev.idx == 0) {
+        work_queue_run(octx->ctx->work_queue, cpy_dma_convert_thread, octx, octx->n_threads);
+    }
+    return HTP_STATUS_OK;
+}
+
 static int exec_cpy(struct htp_ops_context * octx, bool * use_dma) {
     cpy_preamble;
     *use_dma = false;
 
     const uint32_t total_elems_src = ne00 * ne01 * ne02 * ne03;
     const uint32_t total_elems_dst = ne0 * ne1 * ne2 * ne3;
-    if (total_elems_src == 1 && total_elems_dst == 1) {
+    if (total_elems_src == total_elems_dst && src0->type != dst->type &&
+        (htp_tensor_is_extended(src0) || htp_tensor_is_extended(dst))) {
+        *use_dma = true;
+        return cpy_dma_convert(octx);
+    }
+    if (total_elems_src == 1 && total_elems_dst == 1 &&
+        !htp_tensor_is_extended(src0) && !htp_tensor_is_extended(dst)) {
         if (octx->ctx->mdev.count > 1 && octx->ctx->mdev.idx > 0) {
             return HTP_STATUS_OK;
         }

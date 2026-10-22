@@ -7030,7 +7030,7 @@ static bool depthwise_conv_1d_fits(const ggml_hexagon_session * sess, const ggml
     const uint64_t out_pitch = htp_dw1d_round_up(mm->ne[0]);
     const uint64_t in_pitch = htp_dw1d_in_pitch(mm->ne[0], mm->src[1]->ne[0], p[4], p[2], im2col->src[1]->ne[0]);
     return in_pitch <= UINT32_MAX && out_pitch <= UINT32_MAX &&
-           htp_dw1d_vtcm_bytes(mm->ne[2], in_pitch, out_pitch) <= sess->vtcm_size;
+           htp_dw1d_vtcm_bytes(mm->ne[2], in_pitch, out_pitch, mm->src[1]->ne[0]) <= sess->vtcm_size;
 }
 
 static bool can_fuse_depthwise_conv_1d(const ggml_hexagon_session * sess, const ggml_cgraph * graph, int i) {

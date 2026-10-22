@@ -8,6 +8,7 @@
 #include "hex-profile.h"
 #include "htp-ctx.h"
 #include "htp-ops.h"
+#include "htp-dma-reader.h"
 #include "hvx-utils.h"
 
 struct htp_conv_dw_context {
@@ -16,24 +17,36 @@ struct htp_conv_dw_context {
     uint32_t rows_per_thread;
     bool channels_contiguous;
     bool planar_stride2_3x3;
+    size_t reader_offset;
+};
+
+struct conv_dw_access {
+    const struct htp_ops_context * octx;
+    struct htp_dma_reader weights;
+    struct htp_dma_reader input;
 };
 
 // All addresses use the original tensor strides, including the permuted
 // [KW, KH, 1, C] weight view used by Parakeet's channel-contiguous conformer.
-static inline float conv_dw_weight(const struct htp_tensor *k, uint32_t x, uint32_t y, uint32_t c) {
-    const uint8_t *p = (const uint8_t *)k->data + x * k->nb[0] + y * k->nb[1] + c * k->nb[3];
+static inline float conv_dw_weight(struct conv_dw_access * access, uint32_t x, uint32_t y, uint32_t c) {
+    const struct htp_tensor * k = access->weights.tensor;
+    const void * p = htp_dma_reader_view(&access->weights, x * k->nb[0] + y * k->nb[1] + c * k->nb[3],
+        k->type == HTP_TYPE_F16 ? sizeof(__fp16) : sizeof(float));
     return k->type == HTP_TYPE_F16 ? (float)*(const __fp16 *)p : *(const float *)p;
 }
 
-static inline const float *conv_dw_input(const struct htp_tensor *x, uint32_t w, uint32_t h, uint32_t c, uint32_t n) {
-    return (const float *)((const uint8_t *)x->data + w * x->nb[0] + h * x->nb[1] + c * x->nb[2] + n * x->nb[3]);
+static inline const float *conv_dw_input(struct conv_dw_access * access, uint32_t w, uint32_t h, uint32_t c, uint32_t n, uint32_t count) {
+    const struct htp_tensor * x = access->input.tensor;
+    return htp_dma_reader_view(&access->input, w * x->nb[0] + h * x->nb[1] + c * x->nb[2] + n * x->nb[3],
+        count * sizeof(float));
 }
 
 static inline float *conv_dw_output(const struct htp_tensor *y, uint32_t w, uint32_t h, uint32_t c, uint32_t n) {
     return (float *)((uint8_t *)y->data + w * y->nb[0] + h * y->nb[1] + c * y->nb[2] + n * y->nb[3]);
 }
 
-static float conv_dw_scalar(const struct htp_ops_context *octx, uint32_t ox, uint32_t oy, uint32_t c, uint32_t n) {
+static float conv_dw_scalar(struct conv_dw_access * access, uint32_t ox, uint32_t oy, uint32_t c, uint32_t n) {
+    const struct htp_ops_context * octx = access->octx;
     const struct htp_tensor *k = octx->src[0];
     const struct htp_tensor *x = octx->src[1];
     const int32_t *p = octx->op_params;
@@ -46,7 +59,7 @@ static float conv_dw_scalar(const struct htp_ops_context *octx, uint32_t ox, uin
         for (uint32_t kx = 0; kx < k->ne[0]; ++kx) {
             const int64_t ix = (int64_t)ox * p[0] - p[2] + (int64_t)kx * p[4];
             if (ix >= 0 && ix < x->ne[0]) {
-                sum += conv_dw_weight(k, kx, ky, c) * *conv_dw_input(x, ix, iy, c, n);
+                sum += conv_dw_weight(access, kx, ky, c) * *conv_dw_input(access, ix, iy, c, n, 1);
             }
         }
     }
@@ -56,7 +69,8 @@ static float conv_dw_scalar(const struct htp_ops_context *octx, uint32_t ox, uin
 // Channel-vectorized FP32 accumulation avoids activation transposes and the
 // large im2col temporary for the conformer's [T, 1, C, N] depthwise
 // convolution.
-static void conv_dw_channels_point(const struct htp_ops_context *octx, uint32_t ox, uint32_t oy, uint32_t n) {
+static void conv_dw_channels_point(struct conv_dw_access * access, uint32_t ox, uint32_t oy, uint32_t n) {
+    const struct htp_ops_context * octx = access->octx;
     const struct htp_tensor *k = octx->src[0];
     const struct htp_tensor *x = octx->src[1];
     const struct htp_tensor *y = octx->dst;
@@ -74,8 +88,9 @@ static void conv_dw_channels_point(const struct htp_ops_context *octx, uint32_t 
                 if (ix < 0 || ix >= x->ne[0]) {
                     continue;
                 }
-                const HVX_Vector xv = *(const HVX_UVector *)conv_dw_input(x, ix, iy, c, n);
-                const uint8_t *kp = (const uint8_t *)k->data + kx * k->nb[0] + ky * k->nb[1] + c * k->nb[3];
+                const HVX_Vector xv = *(const HVX_UVector *)conv_dw_input(access, ix, iy, c, n, VLEN_FP32);
+                const void * kp = htp_dma_reader_view(&access->weights, kx * k->nb[0] + ky * k->nb[1] + c * k->nb[3],
+                    VLEN_FP32 * (k->type == HTP_TYPE_F32 ? sizeof(float) : sizeof(__fp16)));
                 HVX_Vector kv;
                 if (k->type == HTP_TYPE_F32) {
                     kv = *(const HVX_UVector *)kp;
@@ -92,14 +107,15 @@ static void conv_dw_channels_point(const struct htp_ops_context *octx, uint32_t 
         *(HVX_UVector *)conv_dw_output(y, ox, oy, c, n) = sum;
     }
     for (; c < x->ne[2]; ++c) {
-        *conv_dw_output(y, ox, oy, c, n) = conv_dw_scalar(octx, ox, oy, c, n);
+        *conv_dw_output(y, ox, oy, c, n) = conv_dw_scalar(access, ox, oy, c, n);
     }
 }
 
 // WHCN: vectorize independent output positions. Strided samples and padded
 // edges are staged in a bounded stack tile; interior stride-1 loads use HVX
-// directly. No VTCM allocation or im2col buffer is required.
-static void conv_dw_planar_row(const struct htp_ops_context *octx, uint32_t oy, uint32_t c, uint32_t n) {
+// directly for normal-address inputs.
+static void conv_dw_planar_row(struct conv_dw_access * access, uint32_t oy, uint32_t c, uint32_t n) {
+    const struct htp_ops_context * octx = access->octx;
     const struct htp_tensor *k = octx->src[0];
     const struct htp_tensor *x = octx->src[1];
     const struct htp_tensor *y = octx->dst;
@@ -116,23 +132,23 @@ static void conv_dw_planar_row(const struct htp_ops_context *octx, uint32_t oy, 
                 const int64_t ix = (int64_t)ox * p[0] - p[2] + (int64_t)kx * p[4];
                 HVX_Vector xv;
                 if (p[0] == 1 && ix >= 0 && ix + VLEN_FP32 <= x->ne[0]) {
-                    xv = *(const HVX_UVector *)conv_dw_input(x, ix, iy, c, n);
+                    xv = *(const HVX_UVector *)conv_dw_input(access, ix, iy, c, n, VLEN_FP32);
                 } else {
                     float tile[VLEN_FP32] __attribute__((aligned(128)));
                     for (uint32_t lane = 0; lane < VLEN_FP32; ++lane) {
                         const int64_t sx = ix + (int64_t)lane * p[0];
-                        tile[lane] = sx >= 0 && sx < x->ne[0] ? *conv_dw_input(x, sx, iy, c, n) : 0.0f;
+                        tile[lane] = sx >= 0 && sx < x->ne[0] ? *conv_dw_input(access, sx, iy, c, n, 1) : 0.0f;
                     }
                     xv = *(const HVX_Vector *)tile;
                 }
-                const HVX_Vector kv = hvx_vec_splat_f32(conv_dw_weight(k, kx, ky, c));
+                const HVX_Vector kv = hvx_vec_splat_f32(conv_dw_weight(access, kx, ky, c));
                 sum = hvx_vec_add_f32_f32(sum, hvx_vec_mul_f32_f32(xv, kv));
             }
         }
         *(HVX_UVector *)conv_dw_output(y, ox, oy, c, n) = sum;
     }
     for (; ox < y->ne[0]; ++ox) {
-        *conv_dw_output(y, ox, oy, c, n) = conv_dw_scalar(octx, ox, oy, c, n);
+        *conv_dw_output(y, ox, oy, c, n) = conv_dw_scalar(access, ox, oy, c, n);
     }
 }
 
@@ -140,8 +156,8 @@ static void conv_dw_planar_row(const struct htp_ops_context *octx, uint32_t oy, 
 // contiguous input words into stride-2 samples instead of gathering each lane
 // for each tap. Partial output tiles use the same vector arithmetic as full
 // tiles; bounded staging handles row ends and implicit horizontal padding.
-static void conv_dw_planar_stride2_3x3_row(const struct htp_ops_context *octx, uint32_t oy, uint32_t c, uint32_t n) {
-    const struct htp_tensor *k = octx->src[0];
+static void conv_dw_planar_stride2_3x3_row(struct conv_dw_access * access, uint32_t oy, uint32_t c, uint32_t n) {
+    const struct htp_ops_context * octx = access->octx;
     const struct htp_tensor *x = octx->src[1];
     const struct htp_tensor *y = octx->dst;
     const int32_t *p = octx->op_params;
@@ -159,7 +175,7 @@ static void conv_dw_planar_stride2_3x3_row(const struct htp_ops_context *octx, u
 
             HVX_Vector lo, hi;
             if (ix >= 0 && ix + 2 * VLEN_FP32 <= x->ne[0]) {
-                const float *row = conv_dw_input(x, ix, iy, c, n);
+                const float *row = conv_dw_input(access, ix, iy, c, n, 2 * VLEN_FP32);
                 lo = *(const HVX_UVector *)row;
                 hi = *(const HVX_UVector *)(row + VLEN_FP32);
             } else {
@@ -171,7 +187,7 @@ static void conv_dw_planar_stride2_3x3_row(const struct htp_ops_context *octx, u
                 const int64_t begin = MAX(ix, 0);
                 const int64_t end = MIN(ix + MIN(2 * lanes + 1, 2 * VLEN_FP32), x->ne[0]);
                 if (end > begin) {
-                    memcpy(tile + (begin - ix), conv_dw_input(x, begin, iy, c, n),
+                    memcpy(tile + (begin - ix), conv_dw_input(access, begin, iy, c, n, end - begin),
                            (end - begin) * sizeof(float));
                 }
                 lo = ((const HVX_Vector *)tile)[0];
@@ -186,11 +202,11 @@ static void conv_dw_planar_stride2_3x3_row(const struct htp_ops_context *octx, u
             const HVX_Vector odd = Q6_V_hi_W(samples);
             const int64_t last_ix = ix + 2 * VLEN_FP32;
             const float last = lanes == VLEN_FP32 && last_ix >= 0 && last_ix < x->ne[0]
-                                   ? *conv_dw_input(x, last_ix, iy, c, n) : 0.0f;
+                                   ? *conv_dw_input(access, last_ix, iy, c, n, 1) : 0.0f;
             const HVX_Vector next = Q6_V_valign_VVR(hvx_vec_splat_f32(last), even, sizeof(float));
-            const HVX_Vector w0 = hvx_vec_splat_f32(conv_dw_weight(k, 0, ky, c));
-            const HVX_Vector w1 = hvx_vec_splat_f32(conv_dw_weight(k, 1, ky, c));
-            const HVX_Vector w2 = hvx_vec_splat_f32(conv_dw_weight(k, 2, ky, c));
+            const HVX_Vector w0 = hvx_vec_splat_f32(conv_dw_weight(access, 0, ky, c));
+            const HVX_Vector w1 = hvx_vec_splat_f32(conv_dw_weight(access, 1, ky, c));
+            const HVX_Vector w2 = hvx_vec_splat_f32(conv_dw_weight(access, 2, ky, c));
             // Keep the accumulator in IEEE FP32 between taps. Chaining qf32
             // accumulations across consecutive zero products can produce a
             // spurious large exponent at padded edges with zero inputs/weights.
@@ -211,15 +227,19 @@ static void conv_dw_thread(unsigned int nth, unsigned int ith, void *data) {
     const uint32_t oh = octx->dst->ne[1];
     const uint32_t ow = octx->dst->ne[0];
     const uint32_t channels = octx->dst->ne[2];
+    uint8_t * scratch = octx->ctx->vtcm_base + dc->reader_offset + ith * 2 * HTP_DMA_READER_BYTES;
+    struct conv_dw_access access = {octx,
+        htp_dma_reader_init(octx->src[0], octx->ctx->dma[ith], scratch),
+        htp_dma_reader_init(octx->src[1], octx->ctx->dma[ith], scratch + HTP_DMA_READER_BYTES)};
     (void)nth;
     htp_trace_event_start(tr, HTP_TRACE_EVT_HVX_COMP, start);
     for (uint32_t row = start; row < end; ++row) {
         if (dc->channels_contiguous) {
-            conv_dw_channels_point(octx, row % ow, (row / ow) % oh, row / (ow * oh));
+            conv_dw_channels_point(&access, row % ow, (row / ow) % oh, row / (ow * oh));
         } else if (dc->planar_stride2_3x3) {
-            conv_dw_planar_stride2_3x3_row(octx, row % oh, (row / oh) % channels, row / (oh * channels));
+            conv_dw_planar_stride2_3x3_row(&access, row % oh, (row / oh) % channels, row / (oh * channels));
         } else {
-            conv_dw_planar_row(octx, row % oh, (row / oh) % channels, row / (oh * channels));
+            conv_dw_planar_row(&access, row % oh, (row / oh) % channels, row / (oh * channels));
         }
     }
     htp_trace_event_stop(tr, HTP_TRACE_EVT_HVX_COMP, start);
@@ -231,11 +251,25 @@ static void conv_dw_convert_weights(float * dst, const __fp16 * src, size_t coun
     }
 }
 
-static void conv_dw_prepare_weights(struct htp_ops_context * local, struct htp_tensor * weights) {
+static void conv_dw_convert_weights_dma(float * dst, struct htp_dma_reader * reader, size_t count) {
+    for (size_t i = 0; i < count; i += VLEN_FP16) {
+        const uint32_t n = MIN(VLEN_FP16, count - i);
+        const __fp16 * src = htp_dma_reader_view(reader, i * sizeof(__fp16), n * sizeof(__fp16));
+        conv_dw_convert_weights(dst + i, src, n);
+    }
+}
+
+static size_t conv_dw_prepare_weights(struct htp_ops_context * local, struct htp_tensor * weights, uint32_t threads) {
     const struct htp_tensor * src = local->src[0];
     const size_t count = (size_t) src->ne[0] * src->ne[1] * src->ne[3];
-    if (src->type != HTP_TYPE_F16 || count > local->ctx->vtcm_size / sizeof(float)) {
-        return;
+    const size_t reader_bytes = (size_t) threads * 2 * HTP_DMA_READER_BYTES;
+    if (src->type != HTP_TYPE_F16 || reader_bytes > local->ctx->vtcm_size ||
+        count > (local->ctx->vtcm_size - reader_bytes) / sizeof(float)) {
+        return 0;
+    }
+    const size_t offset = hex_round_up(count * sizeof(float), VLEN);
+    if (offset > local->ctx->vtcm_size - reader_bytes) {
+        return 0;
     }
     *weights = *src;
     weights->type = HTP_TYPE_F32;
@@ -244,8 +278,10 @@ static void conv_dw_prepare_weights(struct htp_ops_context * local, struct htp_t
     for (uint32_t i = 0; i < HTP_OP_MAX_DIMS; ++i) {
         weights->nb[i] = src->nb[i] * (sizeof(float) / sizeof(__fp16));
     }
-    conv_dw_convert_weights((float *) local->ctx->vtcm_base, (const __fp16 *) src->data, count);
+    struct htp_dma_reader reader = htp_dma_reader_init(src, local->ctx->dma[0], local->ctx->vtcm_base + offset);
+    conv_dw_convert_weights_dma((float *) local->ctx->vtcm_base, &reader, count);
     local->src[0] = weights;
+    return offset;
 }
 
 int op_conv_2d_dw(struct htp_ops_context *octx) {
@@ -272,8 +308,12 @@ int op_conv_2d_dw(struct htp_ops_context *octx) {
     }
     struct htp_ops_context local = *octx;
     struct htp_tensor weights;
-    conv_dw_prepare_weights(&local, &weights);
-    struct htp_conv_dw_context dc = {&local, rows, (rows + threads - 1) / threads, channels_contiguous, planar_stride2_3x3};
+    if ((size_t) threads * 2 * HTP_DMA_READER_BYTES > octx->ctx->vtcm_size) {
+        return HTP_STATUS_VTCM_TOO_SMALL;
+    }
+    const size_t reader_offset = conv_dw_prepare_weights(&local, &weights, threads);
+    struct htp_conv_dw_context dc = {
+        &local, rows, (rows + threads - 1) / threads, channels_contiguous, planar_stride2_3x3, reader_offset};
     work_queue_run(octx->ctx->work_queue, conv_dw_thread, &dc, threads);
     return HTP_STATUS_OK;
 }

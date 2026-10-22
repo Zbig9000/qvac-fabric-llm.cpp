@@ -7,6 +7,7 @@
 #include "dma-queue.h"
 #include "htp-ctx.h"
 #include "htp-ops.h"
+#include "htp-dma-reader.h"
 #include "hvx-utils.h"
 
 // Output positions handled per (band, channel) pass. A band's columns stay
@@ -23,21 +24,23 @@ struct htp_col2im_1d_context {
     uint32_t                 n_bands;
 };
 
-static inline float col2im_1d_load(const struct htp_tensor * cols, uint32_t row, uint32_t col) {
-    const uint8_t * p = (const uint8_t *) cols->data + row * cols->nb[0] + col * cols->nb[1];
+static inline float col2im_1d_load(struct htp_dma_reader * reader, uint32_t row, uint32_t col) {
+    const struct htp_tensor * cols = reader->tensor;
+    const void * p = htp_dma_reader_view(reader, row * cols->nb[0] + col * cols->nb[1],
+        cols->type == HTP_TYPE_F16 ? sizeof(__fp16) : sizeof(float));
     return cols->type == HTP_TYPE_F16 ? (float) *(const __fp16 *) p : *(const float *) p;
 }
 
 // Sum of every (column, tap) pair landing on one output position, walking taps
 // k, k + stride, ... from the last contributing column backwards.
-static float col2im_1d_gather(const struct htp_col2im_1d_context * cctx, uint32_t row0, int64_t col, uint32_t k) {
+static float col2im_1d_gather(const struct htp_col2im_1d_context * cctx, struct htp_dma_reader * reader, uint32_t row0, int64_t col, uint32_t k) {
     const struct htp_tensor * cols   = cctx->octx->src[0];
     const uint32_t            n_cols = cols->ne[1];
 
     float sum = 0.0f;
     for (; k < cctx->kernel && col >= 0; k += cctx->stride, col--) {
         if ((uint64_t) col < n_cols) {
-            sum += col2im_1d_load(cols, row0 + k, (uint32_t) col);
+            sum += col2im_1d_load(reader, row0 + k, (uint32_t) col);
         }
     }
     return sum;
@@ -53,7 +56,7 @@ static inline void col2im_1d_store(const struct htp_tensor * dst, uint8_t * row,
 
 // The last contributing column and its tap advance by one position at a time,
 // so only the band start needs a division (Hexagon has no integer divider).
-static void col2im_1d_band_channel(const struct htp_col2im_1d_context * cctx, uint32_t oc, uint32_t t0, uint32_t t1) {
+static void col2im_1d_band_channel(const struct htp_col2im_1d_context * cctx, struct htp_dma_reader * reader, uint32_t oc, uint32_t t0, uint32_t t1) {
     const struct htp_tensor * dst  = cctx->octx->dst;
     uint8_t *                 row  = (uint8_t *) dst->data + oc * dst->nb[1];
     const uint32_t            row0 = oc * cctx->kernel;
@@ -62,7 +65,7 @@ static void col2im_1d_band_channel(const struct htp_col2im_1d_context * cctx, ui
     int64_t        col   = t_abs / cctx->stride;
     uint32_t       k     = t_abs - (uint32_t) col * cctx->stride;
     for (uint32_t t = t0; t < t1; t++) {
-        col2im_1d_store(dst, row, t, col2im_1d_gather(cctx, row0, col, k));
+        col2im_1d_store(dst, row, t, col2im_1d_gather(cctx, reader, row0, col, k));
         if (++k == cctx->stride) {
             k = 0;
             col++;
@@ -70,12 +73,12 @@ static void col2im_1d_band_channel(const struct htp_col2im_1d_context * cctx, ui
     }
 }
 
-static void col2im_1d_band(const struct htp_col2im_1d_context * cctx, uint32_t band) {
+static void col2im_1d_band(const struct htp_col2im_1d_context * cctx, struct htp_dma_reader * reader, uint32_t band) {
     const uint32_t t_out = cctx->octx->dst->ne[0];
     const uint32_t t0    = band * COL2IM_1D_BAND;
     const uint32_t t1    = MIN(t0 + COL2IM_1D_BAND, t_out);
     for (uint32_t oc = 0; oc < cctx->channels; oc++) {
-        col2im_1d_band_channel(cctx, oc, t0, t1);
+        col2im_1d_band_channel(cctx, reader, oc, t0, t1);
     }
 }
 
@@ -84,8 +87,10 @@ static void col2im_1d_thread(unsigned int nth, unsigned int ith, void * data) {
 
     const uint32_t start = cctx->bands_per_thread * ith;
     const uint32_t end   = MIN(start + cctx->bands_per_thread, cctx->n_bands);
+    struct htp_dma_reader reader = htp_dma_reader_init(cctx->octx->src[0], cctx->octx->ctx->dma[ith],
+        cctx->octx->ctx->vtcm_base + ith * HTP_DMA_READER_BYTES);
     for (uint32_t band = start; band < end; band++) {
-        col2im_1d_band(cctx, band);
+        col2im_1d_band(cctx, &reader, band);
     }
 }
 
@@ -157,7 +162,7 @@ static void col2im_1d_vtcm_stage(const struct htp_col2im_1d_vtcm * v, dma_queue 
         hvx_splat_f32_a(cols, 0.0f, (uint32_t) (col_end - col_first) * k_oc);
     }
     if (hi > lo) {
-        dma_queue_copy_rows(q, dma_make_data(cols + (lo - col_first) * k_oc, (const uint8_t *) src->data + lo * src->nb[1]),
+        dma_queue_copy_rows(q, dma_make_data(cols + (lo - col_first) * k_oc, src->data + (dma_addr_t) lo * src->nb[1]),
                             k_oc * sizeof(float), src->nb[1], k_oc * sizeof(float), (size_t) (hi - lo));
     }
 }
@@ -277,6 +282,9 @@ int op_col2im_1d(struct htp_ops_context * octx) {
     };
     if (col2im_1d_run_vtcm(octx, &cctx)) {
         return HTP_STATUS_OK;
+    }
+    if ((size_t) threads * HTP_DMA_READER_BYTES > octx->ctx->vtcm_size) {
+        return HTP_STATUS_VTCM_TOO_SMALL;
     }
     work_queue_run(octx->ctx->work_queue, col2im_1d_thread, &cctx, threads);
     return HTP_STATUS_OK;

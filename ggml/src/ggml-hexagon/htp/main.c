@@ -30,7 +30,6 @@
 #include "htp-ctx.h"
 #include "htp-ops.h"
 #include "htp-tensor.h"
-#include "matmul-ops.h"
 #include "htp_iface.h"
 #include "work-queue.h"
 #include "hex-profile.h"
@@ -42,7 +41,6 @@
 #define WORK_QUEUE_CAPACITY    16
 #define WORK_QUEUE_STACK_SIZE  16384
 #define MAIN_THREAD_STACK_SIZE 32768
-#define SPEECH_STAGING_ALIGNMENT 128
 
 _Static_assert(WORK_QUEUE_MAX_N_THREADS >= HTP_MAX_NTHREADS,
                "work-queue thread cap must be >= HTP_MAX_NTHREADS");
@@ -961,74 +959,6 @@ static int execute_op(struct htp_ops_context * octx) {
     return HTP_STATUS_NO_SUPPORT;
 }
 
-static uint32_t speech_direct_inputs(const struct htp_ops_context * octx) {
-    switch (octx->op) {
-        case HTP_OP_COL2IM_1D:
-        case HTP_OP_TIMESTEP_EMBEDDING:
-            return 1;
-        case HTP_OP_CONV_2D_DW:
-            return 3;
-        case HTP_OP_DEPTHWISE_CONV_1D:
-        case HTP_OP_SNAKE:
-            return 7;
-        case HTP_OP_IM2COL:
-            return 2;
-        case HTP_OP_CPY:
-            return octx->src[0]->type != octx->dst->type ? 1 : 0;
-        case HTP_OP_MUL_MAT:
-        case HTP_OP_MUL_MAT_ADD: {
-            const struct htp_mm_kernel_params * p = (const struct htp_mm_kernel_params *) octx->kernel_params;
-            return p->kernel_type == HTP_MM_KERNEL_HVX_F16_F16_K9 ? 3 :
-                   (p->n_hmx && octx->src[1]->type == HTP_TYPE_F16 ? 2 : 0);
-        }
-        default:
-            return 0;
-    }
-}
-
-static size_t speech_staging_size(const struct htp_ops_context * octx, uint32_t mask) {
-    size_t size = 0;
-    for (uint32_t i = 0; i < HTP_OP_MAX_INPUTS; ++i) {
-        if ((mask & (1U << i)) && htp_tensor_is_extended(octx->src[i])) {
-            const size_t span = octx->src[i]->size;
-            if (span > SIZE_MAX - size - SPEECH_STAGING_ALIGNMENT) { return SIZE_MAX; }
-            size += hex_round_up(span, SPEECH_STAGING_ALIGNMENT);
-        }
-    }
-    return size;
-}
-
-static void speech_stage_inputs(struct htp_ops_context * local, struct htp_tensor * tensors, uint8_t * buffer,
-                                 uint32_t mask) {
-    dma_queue * q = local->ctx->dma[0];
-    for (uint32_t i = 0; i < HTP_OP_MAX_INPUTS; ++i) {
-        if (!(mask & (1U << i)) || !htp_tensor_is_extended(local->src[i])) { continue; }
-        tensors[i] = *local->src[i];
-        dma_queue_copy_rows(q, dma_make_data(buffer, tensors[i].data), tensors[i].size, tensors[i].size,
-                            tensors[i].size, 1);
-        tensors[i].data = (uintptr_t) buffer;
-        local->src[i] = &tensors[i];
-        buffer += hex_round_up(tensors[i].size, SPEECH_STAGING_ALIGNMENT);
-    }
-}
-
-static int execute_op_with_speech_inputs(struct htp_ops_context * octx) {
-    const uint32_t mask = speech_direct_inputs(octx);
-    const size_t size = speech_staging_size(octx, mask);
-    if (size == 0) { return execute_op(octx); }
-    if (size == SIZE_MAX) { return HTP_STATUS_INVAL_PARAMS; }
-    uint8_t * buffer = memalign(SPEECH_STAGING_ALIGNMENT, size);
-    if (!buffer) { return HTP_STATUS_INTERNAL_ERR; }
-    struct htp_ops_context local = *octx;
-    struct htp_tensor tensors[HTP_OP_MAX_INPUTS];
-    hex_l2flush(buffer, size);
-    speech_stage_inputs(&local, tensors, buffer, mask);
-    const int status = execute_op(&local);
-    free(buffer);
-    return status;
-}
-
-
 static inline bool reuse_buf(struct htp_context *ctx, uint32_t *m_reuse, struct htp_buf_desc *b) {
     b->base = NULL;
 
@@ -1223,7 +1153,7 @@ static int proc_op_req(struct htp_ops_context * octx, struct htp_buf_desc * bufs
 
     htp_mdev_group_barrier(octx);
 
-    int status = execute_op_with_speech_inputs(octx);
+    int status = execute_op(octx);
 
     htp_ops_context_set_status(octx, status);
 

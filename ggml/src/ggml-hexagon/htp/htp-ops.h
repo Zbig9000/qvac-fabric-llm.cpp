@@ -284,11 +284,15 @@ static inline uint64_t htp_dw1d_in_pitch(uint32_t out_len, uint32_t taps, uint32
     return htp_dw1d_round_up(reach > staged ? reach : staged);
 }
 
-static inline size_t htp_dw1d_vtcm_bytes(uint32_t channels, uint64_t in_pitch, uint64_t out_pitch) {
+static inline size_t htp_dw1d_vtcm_bytes(uint32_t channels, uint64_t in_pitch, uint64_t out_pitch, uint32_t taps) {
     if (in_pitch > SIZE_MAX || out_pitch > SIZE_MAX - in_pitch) {
         return SIZE_MAX;
     }
-    const size_t pitch = in_pitch + out_pitch;
+    const uint64_t weight_pitch = htp_dw1d_round_up(taps);
+    if (weight_pitch > SIZE_MAX - (in_pitch + out_pitch)) {
+        return SIZE_MAX;
+    }
+    const size_t pitch = in_pitch + out_pitch + weight_pitch;
     if (pitch > SIZE_MAX / sizeof(float) || (pitch && channels > SIZE_MAX / sizeof(float) / pitch)) {
         return SIZE_MAX;
     }

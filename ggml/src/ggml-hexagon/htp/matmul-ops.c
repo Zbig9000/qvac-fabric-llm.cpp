@@ -21,6 +21,7 @@
 #include "ggml-common.h"
 #include "htp-ctx.h"
 #include "htp-ops.h"
+#include "htp-dma-reader.h"
 #include "htp-tensor.h"
 #include "matmul-ops.h"
 #include "htp-vtcm.h"
@@ -2512,7 +2513,7 @@ struct activation_transfer_params {
     struct htp_context *          ctx;
     __fp16 *                      dst;
     dma_addr_t                    act_dma_addr;
-    const __fp16 *                src_f16;
+    bool                          activation_f16;
     int                           n_rows;
     int                           k_block;
     int                           k_stride;
@@ -2526,7 +2527,10 @@ struct activation_transfer_params {
 
 typedef struct {
     __fp16 *       dst;
-    const __fp16 * src;
+    dma_addr_t     src;
+    struct htp_context * ctx;
+    uint8_t *      scratch;
+    size_t         scratch_stride;
     uint32_t       n_rows;
     uint32_t       k_block;
     uint32_t       k_stride;
@@ -2534,14 +2538,34 @@ typedef struct {
     uint32_t       n_tasks;
 } activation_f16_transfer_state_t;
 
-// One task per 32-row tile row, so each task writes whole tiles.
+static void transfer_activation_f16_tile(const activation_f16_transfer_state_t * st, uint32_t row,
+                                         uint32_t rows, unsigned int ith) {
+    __fp16 * scratch = (__fp16 *) (st->scratch + ith * st->scratch_stride);
+    assert(st->scratch_stride >= 2 * st->k_block * sizeof(__fp16));
+    for (uint32_t r = 0; r < HTP_MM_HMX_TILE_N_ROWS; r += 2) {
+        const uint32_t count = r < rows ? MIN(2U, rows - r) : 0;
+        if (count) {
+            dma_queue_copy_rows(st->ctx->dma[ith],
+                dma_make_data(scratch, st->src + (dma_addr_t) (row + r) * st->k_stride * sizeof(__fp16)),
+                st->k_block * sizeof(__fp16), st->k_stride * sizeof(__fp16), st->k_valid * sizeof(__fp16), count);
+        }
+        transfer_activation_row_pair_fp16(st->dst + (size_t) row * st->k_block,
+            count ? scratch : NULL, count > 1 ? scratch + st->k_block : NULL, r, st->k_block, st->k_valid);
+    }
+}
+
 static void transfer_activation_f16_worker_fn(unsigned int n, unsigned int i, void *data) {
-    const activation_f16_transfer_state_t *st = (const activation_f16_transfer_state_t *) data;
+    const activation_f16_transfer_state_t * st = data;
     for (uint32_t task = i; task < st->n_tasks; task += n) {
-        const uint32_t row  = task * HTP_MM_HMX_TILE_N_ROWS;
+        const uint32_t row = task * HTP_MM_HMX_TILE_N_ROWS;
         const uint32_t rows = MIN(st->n_rows - row, HTP_MM_HMX_TILE_N_ROWS);
-        transfer_activation_chunk_fp16(st->dst + (size_t) row * st->k_block, st->src + (size_t) row * st->k_stride,
-                                       rows, st->k_block, st->k_stride, st->k_valid);
+        if (((uint64_t) st->src >> 32) != 0) {
+            transfer_activation_f16_tile(st, row, rows, i);
+        } else {
+            transfer_activation_chunk_fp16(st->dst + (size_t) row * st->k_block,
+                (const __fp16 *) (uintptr_t) st->src + (size_t) row * st->k_stride,
+                rows, st->k_block, st->k_stride, st->k_valid);
+        }
     }
 }
 
@@ -2551,7 +2575,10 @@ static void transfer_activation_chunk_f16_threaded(const struct activation_trans
     }
     activation_f16_transfer_state_t state = {
         .dst      = params->dst,
-        .src      = params->src_f16,
+        .src      = params->act_dma_addr,
+        .ctx      = params->ctx,
+        .scratch  = (uint8_t *) params->vtcm_f32_act,
+        .scratch_stride = hex_align_down(params->vtcm_f32_act_bytes / params->n_threads, 128),
         .n_rows   = (uint32_t) params->n_rows,
         .k_block  = (uint32_t) params->k_block,
         .k_stride = (uint32_t) params->k_stride,
@@ -2567,7 +2594,7 @@ static void transfer_activation_chunk_f16_threaded(const struct activation_trans
 }
 
 static void transfer_activation_chunk_threaded(const struct activation_transfer_params * params) {
-    if (params->src_f16) {
+    if (params->activation_f16) {
         transfer_activation_chunk_f16_threaded(params);
         return;
     }
@@ -2822,8 +2849,8 @@ static int hmx_mm_2d_f32(struct htp_context *ctx,
             struct activation_transfer_params act_params = {
                 .ctx = ctx,
                 .dst = vtcm_f16_act,
-                .act_dma_addr = act_dma_addr + mr * act_stride * sizeof(float),
-                .src_f16 = activation_f16 ? (const __fp16 *) (uintptr_t) act_dma_addr + mr * act_stride : NULL,
+                .act_dma_addr = act_dma_addr + mr * act_stride * (activation_f16 ? sizeof(__fp16) : sizeof(float)),
+                .activation_f16 = activation_f16,
                 .n_rows = (int) n_rows,
                 .k_block = k,
                 .k_stride = act_stride,
@@ -2918,8 +2945,8 @@ static int hmx_mm_2d_f32(struct htp_context *ctx,
             struct activation_transfer_params act_params = {
                 .ctx = ctx,
                 .dst = vtcm_f16_act,
-                .act_dma_addr = act_dma_addr + mr * act_stride * sizeof(float),
-                .src_f16 = activation_f16 ? (const __fp16 *) (uintptr_t) act_dma_addr + mr * act_stride : NULL,
+                .act_dma_addr = act_dma_addr + mr * act_stride * (activation_f16 ? sizeof(__fp16) : sizeof(float)),
+                .activation_f16 = activation_f16,
                 .n_rows = (int) n_rows,
                 .k_block = k,
                 .k_stride = act_stride,
@@ -3852,6 +3879,9 @@ static void hvx_mm_k9_thread(unsigned int nth, unsigned int ith, void * data) {
     const uint32_t tiles = (rows + VLEN_FP16 - 1) / VLEN_FP16;
     const uint32_t first = (uint64_t) tiles * ith / nth;
     const uint32_t last = (uint64_t) tiles * (ith + 1) / nth;
+    uint8_t * scratch = octx->ctx->vtcm_base + ith * 2 * HTP_DMA_READER_BYTES;
+    struct htp_dma_reader ar = htp_dma_reader_init(a, octx->ctx->dma[ith], scratch);
+    struct htp_dma_reader br = htp_dma_reader_init(b, octx->ctx->dma[ith], scratch + HTP_DMA_READER_BYTES);
     __fp16 tile[9][VLEN_FP16] __attribute__((aligned(128)));
     struct htp_thread_trace * tr = &octx->ctx->trace[ith];
     htp_trace_event_start(tr, HTP_TRACE_EVT_HVX_COMP, first);
@@ -3859,7 +3889,7 @@ static void hvx_mm_k9_thread(unsigned int nth, unsigned int ith, void * data) {
     for (uint32_t t = first; t < last; ++t) {
         const uint32_t row = t * VLEN_FP16;
         const uint32_t count = MIN(VLEN_FP16, rows - row);
-        const __fp16 * in = (const __fp16 *) a->data + (size_t) row * 9;
+        const __fp16 * in = htp_dma_reader_view(&ar, row * 9 * sizeof(__fp16), count * 9 * sizeof(__fp16));
         for (uint32_t k = 0; k < 9; ++k) {
             for (uint32_t lane = 0; lane < count; ++lane) {
                 tile[k][lane] = in[lane * 9 + k];
@@ -3872,7 +3902,7 @@ static void hvx_mm_k9_thread(unsigned int nth, unsigned int ith, void * data) {
             *(HVX_Vector *) tile[k] = Q6_Vh_vshuff_Vh(*(const HVX_Vector *) tile[k]);
         }
         for (uint32_t col = 0; col < b->ne[1]; ++col) {
-            const __fp16 * weights = (const __fp16 *) b->data + (size_t) col * 9;
+            const __fp16 * weights = htp_dma_reader_view(&br, col * 9 * sizeof(__fp16), 9 * sizeof(__fp16));
             HVX_VectorPair sum = Q6_W_vzero();
             #pragma unroll(9)
             for (uint32_t k = 0; k < 9; ++k) {
@@ -3893,6 +3923,9 @@ int op_matmul(struct htp_ops_context * octx) {
     const struct htp_mm_kernel_params * kparams = (const struct htp_mm_kernel_params *) octx->kernel_params;
 
     if (kparams->kernel_type == HTP_MM_KERNEL_HVX_F16_F16_K9) {
+        if ((size_t) octx->n_threads * 2 * HTP_DMA_READER_BYTES > octx->ctx->vtcm_size) {
+            return HTP_STATUS_VTCM_TOO_SMALL;
+        }
         work_queue_run(octx->ctx->work_queue, hvx_mm_k9_thread, octx, octx->n_threads);
         return HTP_STATUS_OK;
     }

@@ -56,7 +56,7 @@
 #define N_R0_Q8_0 2
 #define N_SG_Q8_0 4
 
-#define N_R0_MXFP4 2
+#define N_R0_MXFP4 4
 #define N_SG_MXFP4 2
 
 #define N_R0_Q2_K 4
@@ -415,6 +415,29 @@ typedef struct {
     float    sin_sign;
 } ggml_metal_kargs_rope;
 
+// fused RMS_NORM + MUL + ROPE (+ SET_ROWS): the rows are normalized, weighted and rotated over their full width
+typedef struct {
+    int32_t  ne00;     // row width: the norm width and the RoPE dims
+    int32_t  ne01;     // rows per token (heads)
+    int32_t  ne02;     // tokens
+    uint64_t nb01;     // src row stride
+    uint64_t nb02;     // src token stride
+    uint64_t nb1;      // dst row stride
+    uint64_t nb2;      // dst token stride
+    uint64_t nb_set;   // set_rows: dst stride per row index
+    float    eps;
+    int32_t  n_ctx_orig;
+    float    freq_base;
+    float    freq_scale;
+    float    ext_factor;
+    float    attn_factor;
+    float    beta_fast;
+    float    beta_slow;
+    bool     src2;     // RoPE frequency factors
+    bool     set_rows; // write each token to the dst row given by the indices instead of its own row
+    bool     idx_i32;  // the indices are i32, else i64
+} ggml_metal_kargs_norm_rope;
+
 typedef struct {
     int32_t  ne0;
     int32_t  ne1;
@@ -580,6 +603,7 @@ typedef struct {
     int32_t  nr0;
     int16_t  r2;
     int16_t  r3;
+    float    eps; // fused RMS_NORM (FC_mul_mv_norm)
 } ggml_metal_kargs_mul_mv;
 
 typedef struct {

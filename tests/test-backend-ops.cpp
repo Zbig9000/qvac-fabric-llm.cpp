@@ -10700,6 +10700,163 @@ struct test_mul_mat_add : public test_case {
     }
 };
 
+// RMS_NORM + MUL (weight) consumed by n_mm mat-vecs, as for attn_norm -> Q/K/V and ffn_norm -> gate/up.
+// a backend may fold the norm into the mat-vecs; extra_use gives the normalized row another consumer and n > 1 rows
+// make it a mat-mat, both of which must keep the norm
+struct test_rms_norm_mul_mv : public test_case {
+    const ggml_type type_a;
+    const int64_t k;
+    const int64_t m;
+    const int n_mm;
+    const int64_t n;
+    const bool extra_use;
+
+    std::string vars() override {
+        return VARS_TO_STR6(type_a, k, m, n_mm, n, extra_use);
+    }
+
+    std::string op_desc(ggml_tensor * t) override {
+        GGML_UNUSED(t);
+        return "RMS_NORM_MUL_MV";
+    }
+
+    bool run_whole_graph() override { return true; }
+
+    double max_nmse_err() override {
+        return 5e-4;
+    }
+
+    test_rms_norm_mul_mv(ggml_type type_a = GGML_TYPE_Q4_0, int64_t k = 2560, int64_t m = 1024, int n_mm = 3,
+            int64_t n = 1, bool extra_use = false)
+        : type_a(type_a), k(k), m(m), n_mm(n_mm), n(n), extra_use(extra_use) {}
+
+    // only the sum is compared: the mat-vec outputs themselves may be elided by other fusions (e.g. MUL_MAT + ADD)
+    ggml_tensor * build_graph(ggml_context * ctx) override {
+        ggml_tensor * x = ggml_new_tensor_2d(ctx, GGML_TYPE_F32, k, n);
+        ggml_set_name(x, "x");
+        ggml_tensor * w = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, k);
+        ggml_set_name(w, "w");
+
+        ggml_tensor * cur = ggml_mul(ctx, ggml_rms_norm(ctx, x, 1e-6f), w);
+
+        std::vector<ggml_tensor *> mms;
+        for (int i = 0; i < n_mm; i++) {
+            ggml_tensor * a = ggml_new_tensor_2d(ctx, type_a, k, m);
+            mms.push_back(ggml_mul_mat(ctx, a, cur));
+        }
+
+        // nest the sum so that the mat-vecs are consecutive in the graph: mm0 + (mm1 + (mm2 + ...))
+        ggml_tensor * out = mms[n_mm - 1];
+        for (int i = n_mm - 2; i >= 0; i--) {
+            out = ggml_add(ctx, mms[i], out);
+        }
+
+        if (extra_use) {
+            out = ggml_add(ctx, out, ggml_sum_rows(ctx, cur));
+        }
+
+        ggml_set_name(out, "out");
+
+        return out;
+    }
+};
+
+// RMS_NORM + MUL (weight) + ROPE over the full row width, as the per-head Q/K norms of Qwen3, optionally followed by
+// SET_ROWS of the rotated rows into a cache through a 2D view, as the K-cache write. a backend may fuse the chain;
+// n_dims < ne0 (partial rotation) and extra_use (the normalized rows have another consumer) must keep it unfused
+struct test_rms_norm_rope : public test_case {
+    const int64_t ne0;      // row width (head dim)
+    const int64_t n_head;
+    const int64_t n_tok;
+    const int mode;
+    const bool set_rows;
+    const ggml_type type_dst;
+    const ggml_type type_idx;
+    const bool freq;
+    const float ext_factor;
+    const int n_dims;
+    const bool extra_use;
+
+    static constexpr int64_t n_rows_dst = 64;
+    static constexpr int     n_ctx      = 4096;
+
+    std::string vars() override {
+        return VARS_TO_STR11(ne0, n_head, n_tok, mode, set_rows, type_dst, type_idx, freq, ext_factor, n_dims, extra_use);
+    }
+
+    std::string op_desc(ggml_tensor * t) override {
+        GGML_UNUSED(t);
+        return "RMS_NORM_ROPE";
+    }
+
+    bool run_whole_graph() override { return true; }
+
+    double max_nmse_err() override {
+        return 1e-6;
+    }
+
+    test_rms_norm_rope(int64_t ne0 = 128, int64_t n_head = 8, int64_t n_tok = 1, int mode = GGML_ROPE_TYPE_NEOX,
+            bool set_rows = false, ggml_type type_dst = GGML_TYPE_F16, ggml_type type_idx = GGML_TYPE_I64,
+            bool freq = false, float ext_factor = 0.0f, int n_dims = -1, bool extra_use = false)
+        : ne0(ne0), n_head(n_head), n_tok(n_tok), mode(mode), set_rows(set_rows), type_dst(type_dst), type_idx(type_idx),
+          freq(freq), ext_factor(ext_factor), n_dims(n_dims < 0 ? (int) ne0 : n_dims), extra_use(extra_use) {}
+
+    ggml_tensor * build_graph(ggml_context * ctx) override {
+        ggml_tensor * x = ggml_new_tensor_3d(ctx, GGML_TYPE_F32, ne0, n_head, n_tok);
+        ggml_set_name(x, "x");
+        ggml_tensor * w = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, ne0);
+        ggml_set_name(w, "w");
+        ggml_tensor * pos = ggml_new_tensor_1d(ctx, GGML_TYPE_I32, n_tok);
+        ggml_set_name(pos, "pos");
+        ggml_tensor * ff = nullptr;
+        if (freq) {
+            ff = ggml_new_tensor_1d(ctx, GGML_TYPE_F32, n_dims/2);
+            ggml_set_name(ff, "freq");
+        }
+
+        ggml_tensor * cur = ggml_mul(ctx, ggml_rms_norm(ctx, x, 1e-6f), w);
+        ggml_tensor * out = ggml_rope_ext(ctx, cur, pos, ff, n_dims, mode, n_ctx, 10000.0f, 1.0f, ext_factor, 1.0f, 32.0f, 1.0f);
+
+        if (set_rows) {
+            ggml_tensor * dst = ggml_new_tensor_2d(ctx, type_dst, ne0*n_head, n_rows_dst);
+            ggml_set_name(dst, "dst");
+            ggml_tensor * ids = ggml_new_tensor_1d(ctx, type_idx, n_tok);
+            ggml_set_name(ids, "ids");
+
+            out = ggml_set_rows(ctx, dst, ggml_view_2d(ctx, out, ne0*n_head, n_tok, out->nb[2], 0), ids);
+        }
+
+        if (extra_use) {
+            out = ggml_add(ctx, out, cur);
+        }
+
+        ggml_set_name(out, "out");
+
+        return out;
+    }
+
+    void initialize_tensors(ggml_context * ctx) override {
+        for (ggml_tensor * t = ggml_get_first_tensor(ctx); t != NULL; t = ggml_get_next_tensor(ctx, t)) {
+            if (ggml_is_view_op(t->op)) {
+                continue;
+            }
+            if (strcmp(t->name, "pos") == 0) {
+                std::vector<int32_t> data(t->ne[0]);
+                for (auto & v : data) {
+                    v = rand() % n_ctx;
+                }
+                ggml_backend_tensor_set(t, data.data(), 0, data.size()*sizeof(int32_t));
+            } else if (strcmp(t->name, "ids") == 0) {
+                init_set_rows_row_ids(t, n_rows_dst);
+            } else if (strcmp(t->name, "freq") == 0) {
+                init_tensor_uniform(t, 0.9f, 1.1f);
+            } else {
+                init_tensor_uniform(t);
+            }
+        }
+    }
+};
+
 struct test_mul_mat_vec_fusion : public test_case {
     const ggml_type type;
     const ggml_glu_op glu_op;
@@ -14560,6 +14717,43 @@ static std::vector<std::unique_ptr<test_case>> make_test_cases_eval() {
     }
     test_cases.emplace_back(new test_mul_mat_add(GGML_TYPE_PQ2_0, 2048, 1, 2048, MUL_MAT_ADD_B_INPLACE));
     test_cases.emplace_back(new test_mul_mat_add(GGML_TYPE_PQ2_0, 5120, 1, 6144));
+
+    // RMS_NORM + MUL folded into the consuming mat-vecs
+    for (ggml_type type : {GGML_TYPE_Q4_0, GGML_TYPE_MXFP4}) {
+        for (int n_mm : {1, 2, 3, 4}) {
+            test_cases.emplace_back(new test_rms_norm_mul_mv(type, 2560, 1024, n_mm));
+        }
+        test_cases.emplace_back(new test_rms_norm_mul_mv(type,   96,   33, 3));
+        test_cases.emplace_back(new test_rms_norm_mul_mv(type,  256,   32, 2));
+        test_cases.emplace_back(new test_rms_norm_mul_mv(type, 4096,   64, 2));
+        test_cases.emplace_back(new test_rms_norm_mul_mv(type, 2560, 1024, 3, 1, true)); // other use: keep the norm
+        test_cases.emplace_back(new test_rms_norm_mul_mv(type, 2560,  256, 3, 4));       // 4 rows: keep the norm
+    }
+    test_cases.emplace_back(new test_rms_norm_mul_mv(GGML_TYPE_Q8_0, 2560, 256, 2));   // no fused kernel: keep the norm
+
+    // one src1 row: the Q4_0 and MXFP4 mat-vec stores add the residual (Q8_0 has no such kernel and keeps the ADD)
+    for (ggml_type type_a : {GGML_TYPE_Q4_0, GGML_TYPE_MXFP4, GGML_TYPE_Q8_0}) {
+        for (mul_mat_add_mode mode : {MUL_MAT_ADD_MM_RES, MUL_MAT_ADD_RES_MM, MUL_MAT_ADD_ROW, MUL_MAT_ADD_RES_INPLACE}) {
+            test_cases.emplace_back(new test_mul_mat_add(type_a, 1000, 1, 1024, mode));
+        }
+        test_cases.emplace_back(new test_mul_mat_add(type_a, 2560, 1, 9728));
+        test_cases.emplace_back(new test_mul_mat_add(type_a, 2048, 1, 2048, MUL_MAT_ADD_B_INPLACE)); // must not fuse
+    }
+
+    // RMS_NORM + MUL + ROPE (+ SET_ROWS) fused into one kernel
+    for (int mode : {GGML_ROPE_TYPE_NEOX, GGML_ROPE_TYPE_NORMAL}) {
+        test_cases.emplace_back(new test_rms_norm_rope(128, 32, 1, mode));
+        test_cases.emplace_back(new test_rms_norm_rope(128,  8, 3, mode));
+        test_cases.emplace_back(new test_rms_norm_rope( 64,  5, 2, mode));
+        test_cases.emplace_back(new test_rms_norm_rope(256,  2, 1, mode));
+        test_cases.emplace_back(new test_rms_norm_rope(128,  4, 1, mode, false, GGML_TYPE_F16, GGML_TYPE_I64, true));
+        test_cases.emplace_back(new test_rms_norm_rope(128,  4, 2, mode, false, GGML_TYPE_F16, GGML_TYPE_I64, false, 1.0f));
+        test_cases.emplace_back(new test_rms_norm_rope(128,  8, 1, mode, true,  GGML_TYPE_F16, GGML_TYPE_I64));
+        test_cases.emplace_back(new test_rms_norm_rope(128,  8, 4, mode, true,  GGML_TYPE_F16, GGML_TYPE_I64));
+        test_cases.emplace_back(new test_rms_norm_rope(128,  3, 2, mode, true,  GGML_TYPE_F32, GGML_TYPE_I32, true));
+        test_cases.emplace_back(new test_rms_norm_rope(128,  8, 1, mode, false, GGML_TYPE_F16, GGML_TYPE_I64, false, 0.0f, 64));  // partial rotation: keep
+        test_cases.emplace_back(new test_rms_norm_rope(128,  8, 1, mode, false, GGML_TYPE_F16, GGML_TYPE_I64, false, 0.0f, -1, true)); // other use: keep
+    }
 
     // few src1 rows (speculative verify): odd m, a single K block, long K, every tile width, broadcast batches
     for (int64_t n : {2, 3, 5, 8, 9, 13, 16}) {

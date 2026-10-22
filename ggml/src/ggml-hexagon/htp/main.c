@@ -1020,6 +1020,7 @@ static int execute_op_with_speech_inputs(struct htp_ops_context * octx) {
     if (!buffer) { return HTP_STATUS_INTERNAL_ERR; }
     struct htp_ops_context local = *octx;
     struct htp_tensor tensors[HTP_OP_MAX_INPUTS];
+    hex_l2flush(buffer, size);
     speech_stage_inputs(&local, tensors, buffer, mask);
     const int status = execute_op(&local);
     free(buffer);

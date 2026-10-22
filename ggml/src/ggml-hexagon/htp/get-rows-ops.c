@@ -213,11 +213,25 @@ static __attribute__((noinline)) void compute_get_rows_q8_0(float * dst_spad, co
 GET_ROWS_THREAD_DT_FN(f16,  F16_BYTES,  int32_t, { compute_get_rows_f16((float *)dst_spad, src_spad, cur_elems); })
 GET_ROWS_THREAD_DT_FN(f16,  F16_BYTES,  int64_t, { compute_get_rows_f16((float *)dst_spad, src_spad, cur_elems); })
 
+static void store_get_rows_bf16(float * dst, HVX_Vector values, uint32_t n) {
+    const HVX_VectorPair widened = Q6_W_vshuff_VVR(values, Q6_V_vzero(), -2);
+    const uint32_t first = MIN(n, VLEN_FP32);
+    hvx_vec_store_a(dst, first * sizeof(float), Q6_V_lo_W(widened));
+    if (n > first) {
+        hvx_vec_store_a(dst + first, (n - first) * sizeof(float), Q6_V_hi_W(widened));
+    }
+}
+
 static void compute_get_rows_bf16(float * dst, const void * src, uint32_t n) {
     const uint16_t * values = src;
-    for (uint32_t i = 0; i < n; ++i) {
-        const uint32_t bits = (uint32_t) values[i] << 16;
-        memcpy(dst + i, &bits, sizeof(bits));
+    uint32_t i = 0;
+    for (; i + VLEN_FP16 <= n; i += VLEN_FP16) {
+        store_get_rows_bf16(dst + i, *(const HVX_Vector *) (values + i), VLEN_FP16);
+    }
+    if (i < n) {
+        uint16_t tail[VLEN_FP16] __attribute__((aligned(128))) = {0};
+        memcpy(tail, values + i, (n - i) * sizeof(uint16_t));
+        store_get_rows_bf16(dst + i, *(const HVX_Vector *) tail, n - i);
     }
 }
 

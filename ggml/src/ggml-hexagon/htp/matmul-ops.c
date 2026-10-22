@@ -2699,12 +2699,6 @@ static inline void hmx_matmul_job_init(hmx_matmul_job_t * job,
     job->n_dot_tiles = n_dot_tiles;
 }
 
-// The 2D path pads a partial weight tile for these types and clips the
-// matching output columns; quantized repacked weights keep whole tiles.
-static inline bool hmx_weight_pads_partial_tile(int weight_type) {
-    return weight_type == HTP_TYPE_F16 || weight_type == HTP_TYPE_F32;
-}
-
 static int hmx_mm_2d_f32(struct htp_context *ctx,
                                   dma_queue *weight_dma,
                                   float *restrict dst,
@@ -2734,8 +2728,8 @@ static int hmx_mm_2d_f32(struct htp_context *ctx,
     struct htp_thread_trace * tr = &ctx->trace[0];
     htp_trace_event_start(tr, HTP_TRACE_EVT_INIT, 0);
 
-    if (k % 32 != 0 || (n % 32 != 0 && !hmx_weight_pads_partial_tile(weight_type))) { return -1; }
-    if ((act_dma_addr & (VLEN - 1)) != 0) { return -1; }
+    if (k % 32 != 0 || (n % 32 != 0 && !htp_mm_weight_pads_partial_tile(weight_type))) { return -1; }
+    if (!activation_f16 && (act_dma_addr & (VLEN - 1)) != 0) { return -1; }
 
     size_t row_stride = htp_mm_get_tiled_row_stride(weight_type, k);
     if (row_stride == 0) {

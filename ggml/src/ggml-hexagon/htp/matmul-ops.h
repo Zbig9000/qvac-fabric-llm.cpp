@@ -12,6 +12,10 @@
 extern "C" {
 #endif
 
+static inline bool htp_mm_weight_pads_partial_tile(int weight_type) {
+    return weight_type == HTP_TYPE_F16 || weight_type == HTP_TYPE_F32;
+}
+
 // --- HMX Tile Constraints ---
 #define HTP_MM_HMX_TILE_N_COLS 32
 #define HTP_MM_HMX_TILE_N_ROWS 32

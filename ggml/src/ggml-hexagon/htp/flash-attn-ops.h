@@ -36,7 +36,7 @@ struct htp_fa_kernel_params {
     uint8_t  kernel_type;        // enum htp_fa_kernel_type
     uint8_t  is_q_fp32 : 1;
     uint8_t  is_k_fp32 : 1;
-    uint8_t  is_v_fp32 : 1;          // 1 = Q type is F32, 0 = F16
+    uint8_t  is_v_fp32 : 1;
     uint8_t  is_dst_fp32;        // 1 = dst type is F32, 0 = F16
     uint8_t  n_threads;          // Number of threads to run
 

@@ -497,11 +497,55 @@ static void silu_f32(const void * restrict src,
     }
 }
 
-// gelu(x) = x * sigmoid(1.702 * x)  (quick/sigmoid approximation, matches CPU GELU_QUICK reference)
+static inline HVX_Vector gelu_vec_f32(HVX_Vector x) {
+    const HVX_Vector one  = hvx_vec_splat_f32(1.0f);
+    const HVX_Vector half = hvx_vec_splat_f32(0.5f);
+    const HVX_Vector a    = hvx_vec_splat_f32(0.044715f);
+    const HVX_Vector c    = hvx_vec_splat_f32(0.7978845608028654f);
+
+    HVX_Vector x2 = hvx_vec_mul_f32_f32(x, x);
+    HVX_Vector inner = hvx_vec_mul_f32_f32(c, hvx_vec_mul_f32_f32(x, hvx_vec_add_f32_f32(one, hvx_vec_mul_f32_f32(a, x2))));
+    return hvx_vec_mul_f32_f32(hvx_vec_mul_f32_f32(half, x), hvx_vec_add_f32_f32(one, hvx_vec_tanh_f32(inner)));
+}
+
+static inline void hvx_gelu_f32_aa(uint8_t * restrict dst, const uint8_t * restrict src, uint32_t n) {
+    assert((uintptr_t) dst % 128 == 0);
+    assert((uintptr_t) src % 128 == 0);
+
+    HVX_Vector * restrict vdst = (HVX_Vector *) dst;
+    const HVX_Vector * restrict vsrc = (const HVX_Vector *) src;
+    const uint32_t nvec = n / VLEN_FP32;
+    const uint32_t nloe = n % VLEN_FP32;
+
+    uint32_t i = 0;
+    _Pragma("unroll(4)")
+    for (; i < nvec; i++) {
+        vdst[i] = gelu_vec_f32(vsrc[i]);
+    }
+    if (nloe) {
+        hvx_vec_store_a(&vdst[i], nloe * sizeof(float), gelu_vec_f32(vsrc[i]));
+    }
+}
+
 static void gelu_f32(const void * restrict src,
                      void * restrict dst,
                      const uint32_t num_rows,
                      const struct htp_unary_context * uctx) {
+    htp_unary_op_preamble;
+
+    for (uint32_t ir = 0; ir < num_rows; ir++) {
+        const uint8_t * restrict src_local = (const uint8_t *)src + (ir * src0_row_size_aligned);
+        uint8_t * restrict dst_local       = (uint8_t *)dst + (ir * dst_row_size_aligned);
+
+        hvx_gelu_f32_aa(dst_local, src_local, ne0);
+    }
+}
+
+// gelu_quick(x) = x * sigmoid(1.702 * x)
+static void gelu_quick_f32(const void * restrict src,
+                           void * restrict dst,
+                           const uint32_t num_rows,
+                           const struct htp_unary_context * uctx) {
     htp_unary_op_preamble;
 
     for (uint32_t ir = 0; ir < num_rows; ir++) {
@@ -759,6 +803,11 @@ static void tile_silu_f32(void * restrict dst, const void * restrict src, uint32
 }
 
 static void tile_gelu_f32(void * restrict dst, const void * restrict src, uint32_t tw, const struct htp_unary_context * uctx) {
+    (void) uctx;
+    hvx_gelu_f32_aa((uint8_t *) dst, (const uint8_t *) src, tw);
+}
+
+static void tile_gelu_quick_f32(void * restrict dst, const void * restrict src, uint32_t tw, const struct htp_unary_context * uctx) {
     (void) uctx;
     hvx_mul_scalar_f32((uint8_t *) dst, (const uint8_t *) src, 1.702f, tw);
     hvx_sigmoid_f32_aa((uint8_t *) dst, (uint8_t *) dst, tw);
@@ -1514,6 +1563,7 @@ static int execute_op_unary(struct htp_ops_context * octx) {
         case HTP_OP_UNARY_SIGMOID:   op_type = "sigmoid-f32";                                break;
         case HTP_OP_UNARY_SILU:      op_type = "silu-f32";                                   break;
         case HTP_OP_UNARY_GELU:      op_type = "gelu-f32";                                   break;
+        case HTP_OP_UNARY_GELU_QUICK: op_type = "gelu-quick-f32";                             break;
         case HTP_OP_UNARY_SOFTPLUS:  op_type = "softplus-f32";                               break;
         case HTP_OP_UNARY_TANH:      op_type = "tanh-f32";                                   break;
         case HTP_OP_UNARY_ABS:       op_type = is_f16 ? "abs-f16"      : "abs-f32";          break;
@@ -1664,6 +1714,7 @@ static int execute_op_unary(struct htp_ops_context * octx) {
             case HTP_OP_UNARY_SIGMOID:   compute_func = (void *) tile_sigmoid_f32;        break;
             case HTP_OP_UNARY_SILU:      compute_func = (void *) tile_silu_f32;           break;
             case HTP_OP_UNARY_GELU:      compute_func = (void *) tile_gelu_f32;           break;
+            case HTP_OP_UNARY_GELU_QUICK: compute_func = (void *) tile_gelu_quick_f32;    break;
             case HTP_OP_UNARY_SOFTPLUS:  compute_func = (void *) tile_softplus_f32;       break;
             case HTP_OP_UNARY_TANH:      compute_func = (void *) tile_tanh_f32;           break;
             case HTP_OP_UNARY_ABS:       compute_func = (void *) tile_abs_f32;            break;
@@ -1710,6 +1761,7 @@ static int execute_op_unary(struct htp_ops_context * octx) {
             case HTP_OP_UNARY_SIGMOID:   compute_func = (void *) sigmoid_f32;             break;
             case HTP_OP_UNARY_SILU:      compute_func = (void *) silu_f32;                break;
             case HTP_OP_UNARY_GELU:      compute_func = (void *) gelu_f32;                break;
+            case HTP_OP_UNARY_GELU_QUICK: compute_func = (void *) gelu_quick_f32;         break;
             case HTP_OP_UNARY_SOFTPLUS:  compute_func = (void *) softplus_f32;            break;
             case HTP_OP_UNARY_TANH:      compute_func = (void *) tanh_f32;                break;
             case HTP_OP_UNARY_ABS:       compute_func = (void *) abs_f32;                 break;

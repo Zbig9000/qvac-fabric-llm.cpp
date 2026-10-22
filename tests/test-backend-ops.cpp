@@ -2196,16 +2196,18 @@ struct test_unary : public test_case {
     const ggml_type type;
     const std::array<int64_t, 4> ne_a;
     int v; // view (1 : non-contiguous a)
+    const float input_max;
 
     std::string vars() override {
-        return VARS_TO_STR3(type, ne_a, v);
+        return VARS_TO_STR3(type, ne_a, v) + (input_max == 150.0f ? "" : "," + VAR_TO_STR(input_max));
     }
 
     test_unary(ggml_unary_op op,
             ggml_type type = GGML_TYPE_F32,
             std::array<int64_t, 4> ne_a = {128, 2, 2, 2},
-            int v = 0)
-        : op(op), type(type), ne_a(ne_a), v(v) {}
+            int v = 0,
+            float input_max = 150.0f)
+        : op(op), type(type), ne_a(ne_a), v(v), input_max(input_max) {}
 
     ggml_tensor * build_graph(ggml_context * ctx) override {
         const bool grad_supported = op == GGML_UNARY_OP_ABS || op == GGML_UNARY_OP_SGN || op == GGML_UNARY_OP_NEG ||
@@ -2242,8 +2244,8 @@ struct test_unary : public test_case {
     }
 
     void initialize_tensors(ggml_context * ctx) override {
-        float min = -150.f;
-        float max =  150.f;
+        float min = -input_max;
+        float max =  input_max;
 
         // Keep FP16 exp/expm1 inputs in-range so all backends stay finite instead of
         // disagreeing on whether overflow saturates to max-F16 or produces +inf.
@@ -2275,6 +2277,20 @@ struct test_unary : public test_case {
         return {};
     }
 
+};
+
+struct test_gelu_transition : public test_unary {
+    test_gelu_transition(ggml_unary_op op, std::array<int64_t, 4> ne_a, int v) :
+        test_unary(op, GGML_TYPE_F32, ne_a, v, 5.0f) {}
+
+    double max_nmse_err(ggml_backend_t backend) override {
+        ggml_backend_reg_t reg = ggml_backend_dev_backend_reg(ggml_backend_get_device(backend));
+        if (op == GGML_UNARY_OP_GELU_QUICK && strcmp(ggml_backend_reg_name(reg), "CPU") == 0) {
+            // The CPU QUICK lookup rounds both its input and output to F16.
+            return 2e-7;
+        }
+        return test_unary::max_nmse_err(backend);
+    }
 };
 
 // GGML_OP_GLU
@@ -6684,6 +6700,108 @@ struct test_repacked_mul_mat : public test_case {
     std::string op_desc(ggml_tensor * t) override {
         GGML_UNUSED(t);
         return "MUL_MAT_REPACK";
+    }
+};
+
+struct test_bf16_mul_mat_upload : public test_repacked_mul_mat {
+    ggml_backend_t backend = nullptr;
+    const bool strided_upload;
+    const bool view_upload;
+    bool transfer_ok = true;
+
+    test_bf16_mul_mat_upload(int64_t n, bool strided_upload, bool view_upload = false) :
+        test_repacked_mul_mat(GGML_TYPE_BF16, 64, n, 128), strided_upload(strided_upload), view_upload(view_upload) {}
+
+    std::string vars() override {
+        return test_repacked_mul_mat::vars() + "," + VAR_TO_STR(strided_upload) +
+            (view_upload ? "," + VAR_TO_STR(view_upload) : "");
+    }
+
+    ggml_tensor * build_graph(ggml_context * ctx, ggml_context * ctx_weights) override {
+        ggml_tensor * out = test_repacked_mul_mat::build_graph(ctx, ctx_weights);
+        if (view_upload) {
+            ggml_tensor * weight = ggml_get_tensor(ctx_weights, "weight");
+            ggml_tensor * view = ggml_view_2d(ctx_weights, weight, k, m, weight->nb[1], 0);
+            ggml_set_name(view, "weight_upload_view");
+        }
+        return out;
+    }
+
+    std::string op_desc(ggml_tensor * t) override {
+        GGML_UNUSED(t);
+        return "MUL_MAT_BF16_UPLOAD";
+    }
+
+    bool skip_backend(ggml_backend_t b) override {
+        return strncmp(ggml_backend_name(b), "HTP", 3) != 0;
+    }
+
+    ggml_backend_buffer_type_t weight_buffer_type(ggml_backend_t b) override {
+        backend = b;
+        return ggml_backend_get_default_buffer_type(b);
+    }
+
+    int graph_replays() override { return 2; }
+
+    double err(const float * a, const float * b, size_t n) override {
+        return transfer_ok ? nmse(a, b, n) : INFINITY;
+    }
+
+    void initialize_tensors(ggml_context * ctx) override {
+        test_case::initialize_tensors(ctx);
+        ggml_tensor * weight = ggml_get_tensor(ctx, "weight");
+        if (!weight) {
+            return;
+        }
+        ggml_tensor * upload = view_upload ? ggml_get_tensor(ctx, "weight_upload_view") : weight;
+        GGML_ASSERT(upload != nullptr);
+
+        // Populate the backend's weight cache before changing the uploaded bytes.
+        transfer_ok = ggml_backend_graph_compute(backend, gf) == GGML_STATUS_SUCCESS;
+        std::vector<uint8_t> original(ggml_nbytes(weight));
+        ggml_backend_tensor_get(weight, original.data(), 0, original.size());
+        std::vector<uint8_t> changed = original;
+        for (size_t i = 1; i < changed.size(); i += 2) {
+            changed[i] ^= 0x80;
+        }
+
+        std::vector<uint8_t> expected = changed;
+        if (strided_upload) {
+            const size_t row_size = ggml_row_size(GGML_TYPE_BF16, k);
+            const size_t host_stride = row_size + 5;
+            std::vector<uint8_t> rows(m * host_stride);
+            expected = original;
+            for (int64_t i = 0; i < m; ++i) {
+                memcpy(rows.data() + i * host_stride, changed.data() + i * row_size + 1, row_size - 2);
+                memcpy(expected.data() + i * row_size + 1, changed.data() + i * row_size + 1, row_size - 2);
+            }
+            ggml_backend_tensor_set_2d(upload, rows.data(), 1, row_size - 2, m, row_size, host_stride);
+            std::vector<uint8_t> readback(rows.size());
+            ggml_backend_tensor_get_2d(upload, readback.data(), 1, row_size - 2, m, row_size, host_stride);
+            transfer_ok = transfer_ok && readback == rows;
+        } else {
+            const size_t offsets[] = {0, 7, changed.size() / 2 + 1, changed.size()};
+            for (size_t i = 0; i < 3; ++i) {
+                ggml_backend_tensor_set_async(backend, upload, changed.data() + offsets[i],
+                                              offsets[i], offsets[i + 1] - offsets[i]);
+            }
+        }
+        std::vector<uint8_t> readback(expected.size());
+        ggml_backend_tensor_get_async(backend, weight, readback.data(), 0, readback.size());
+        ggml_backend_synchronize(backend);
+        transfer_ok = transfer_ok && readback == expected;
+
+        ggml_tensor view = *weight;
+        view.view_src = weight;
+        ggml_tensor probe = *ggml_graph_node(gf, 0);
+        probe.op = GGML_OP_MUL_MAT;
+        probe.src[0] = &view;
+        transfer_ok = transfer_ok && !ggml_backend_supports_op(backend, &probe);
+        probe.src[0] = weight;
+        ggml_tensor half_input = *probe.src[1];
+        half_input.type = GGML_TYPE_F16;
+        probe.src[1] = &half_input;
+        transfer_ok = transfer_ok && !ggml_backend_supports_op(backend, &probe);
     }
 };
 
@@ -11552,9 +11670,12 @@ struct test_flash_attn_ext : public test_case {
     const bool v_is_view_of_k;
     const int64_t n_kv_max;
     const int64_t n_sparse_mask;
+    const float scale;
+    const int64_t packed_window; // -1: random mask, 0: full sequence, positive: symmetric window
 
     std::string vars() override {
-        return VARS_TO_STR17(hsk, hsv, nh, nr23, kv, nb, mask, sinks, max_bias, logit_softcap, prec, type_K, type_V, permute, kv_view, v_is_view_of_k, n_kv_max);
+        return VARS_TO_STR17(hsk, hsv, nh, nr23, kv, nb, mask, sinks, max_bias, logit_softcap, prec, type_K, type_V, permute, kv_view, v_is_view_of_k, n_kv_max) +
+            (packed_window < 0 ? "" : "," + VARS_TO_STR2(scale, packed_window));
     }
 
     double max_nmse_err() override {
@@ -11571,9 +11692,10 @@ struct test_flash_attn_ext : public test_case {
     test_flash_attn_ext(int64_t hsk = 128, int64_t hsv = 128, int64_t nh = 32, std::array<int64_t, 2> nr23 = {1, 1}, int64_t kv = 96, int64_t nb = 8,
                         bool mask = true, bool sinks = false, float max_bias = 0.0f, float logit_softcap = 0.0f, ggml_prec prec = GGML_PREC_F32,
                         ggml_type type_K = GGML_TYPE_F16, ggml_type type_V = GGML_TYPE_F16, std::array<int32_t, 4> permute = {0, 1, 2, 3},
-                        bool kv_view = true, bool v_is_view_of_k = false, int64_t n_kv_max = 0, int64_t n_sparse_mask = -1)
+                        bool kv_view = true, bool v_is_view_of_k = false, int64_t n_kv_max = 0, int64_t n_sparse_mask = -1, float scale = 0.0f, int64_t packed_window = -1)
         : hsk(hsk), hsv(hsv), nh(nh), nr23(nr23), kv(kv), nb(nb), mask(mask), sinks(sinks), max_bias(max_bias), logit_softcap(logit_softcap), prec(prec),
-          type_K(type_K), type_V(type_V), permute(permute), kv_view(kv_view), v_is_view_of_k(v_is_view_of_k), n_kv_max(n_kv_max), n_sparse_mask(n_sparse_mask < 0 ? n_kv_max : n_sparse_mask) {}
+          type_K(type_K), type_V(type_V), permute(permute), kv_view(kv_view), v_is_view_of_k(v_is_view_of_k), n_kv_max(n_kv_max), n_sparse_mask(n_sparse_mask < 0 ? n_kv_max : n_sparse_mask),
+          scale(scale == 0.0f ? 1.0f/sqrtf(hsk) : scale), packed_window(packed_window) {}
 
     ggml_tensor * build_graph(ggml_context * ctx) override {
         const int64_t hsk_padded = GGML_PAD(hsk, ggml_blck_size(type_K));
@@ -11638,7 +11760,7 @@ struct test_flash_attn_ext : public test_case {
             ggml_set_name(s, "s");
         }
 
-        ggml_tensor * out = ggml_flash_attn_ext(ctx, q, k, v, m, 1.0f/sqrtf(hsk), max_bias, logit_softcap);
+        ggml_tensor * out = ggml_flash_attn_ext(ctx, q, k, v, m, scale, max_bias, logit_softcap);
         ggml_flash_attn_ext_add_sinks(out, s);
         ggml_flash_attn_ext_set_n_kv_max(out, n_kv_max);
         ggml_prec_set_acc(out, prec);
@@ -11653,7 +11775,18 @@ struct test_flash_attn_ext : public test_case {
                 // make the sink values more noticeable in order to trigger a test failure when the implementation is wrong
                 init_tensor_uniform(t, -10.0f, 10.0f);
             } else if (strcmp(t->name, "m") == 0) {
-                if (mode == MODE_GRAD) {
+                if (packed_window >= 0) {
+                    GGML_ASSERT(kv == nb && kv > 1);
+                    std::vector<ggml_fp16_t> data(ggml_nelements(t));
+                    for (size_t i = 0; i < data.size(); ++i) {
+                        const int64_t key = i % kv;
+                        const int64_t query = (i / kv) % nb;
+                        const bool same_sequence = (key < kv/2) == (query < kv/2);
+                        const bool in_window = packed_window == 0 || std::abs(key - query) <= packed_window;
+                        data[i] = ggml_fp32_to_fp16(same_sequence && in_window ? 0.0f : -INFINITY);
+                    }
+                    ggml_backend_tensor_set(t, data.data(), 0, data.size()*sizeof(ggml_fp16_t));
+                } else if (mode == MODE_GRAD) {
                     init_tensor_kq_mask_causal(t);
                 } else if (n_sparse_mask > 0) {
                     init_tensor_kq_mask_sparse(t, n_sparse_mask);
@@ -13040,6 +13173,14 @@ static std::vector<std::unique_ptr<test_case>> make_test_cases_eval() {
                 test_cases.emplace_back(new test_unary((ggml_unary_op) op, type, { 5, 7, 11, 13 }, v));
             }
         }
+    }
+
+    // The transition range distinguishes GELU from GELU_QUICK; large inputs hide the difference.
+    for (ggml_unary_op op : {GGML_UNARY_OP_GELU, GGML_UNARY_OP_GELU_QUICK}) {
+        test_cases.emplace_back(new test_gelu_transition(op, {512, 3, 1, 1}, 0));
+        test_cases.emplace_back(new test_gelu_transition(op, {513, 3, 1, 1}, 0));
+        test_cases.emplace_back(new test_gelu_transition(op, {513, 3, 2, 1}, 1));
+        test_cases.emplace_back(new test_gelu_transition(op, {262145, 3, 1, 1}, 0));
     }
 
     // fused relu + sqr (squared ReLU)
@@ -15447,6 +15588,14 @@ static std::vector<std::unique_ptr<test_case>> make_test_cases_eval() {
 
     // FLASH_ATTN_EXT causes GPU shader hangs on NVIDIA T4 (Turing) scalar FA path
     if (!getenv("GGML_SKIP_FLASH_ATTN")) {
+        // EmbeddingGemma 2 head sizes and scale, with two packed sequences and symmetric attention.
+        for (int64_t n : {65, 128}) {
+            test_cases.emplace_back(new test_flash_attn_ext(256, 256, 2, {2, 1}, n, n, true, false, 0.0f, 0.0f, GGML_PREC_F32,
+                GGML_TYPE_F16, GGML_TYPE_F16, {0, 1, 2, 3}, false, false, 0, -1, 1.0f, 16));
+            test_cases.emplace_back(new test_flash_attn_ext(512, 512, 1, {4, 1}, n, n, true, false, 0.0f, 0.0f, GGML_PREC_F32,
+                GGML_TYPE_F16, GGML_TYPE_F16, {0, 1, 2, 3}, false, false, 0, -1, 1.0f, 0));
+        }
+
         // prefill-shaped cases with long KV (nb >= 32, kv >= 1024): covers the
         // XMX/GEMM-accelerated SYCL FA path which only activates for these shapes.
         for (int kv : { 1024, 2048, }) {
@@ -16160,6 +16309,13 @@ static std::vector<std::unique_ptr<test_case>> make_test_cases_eval() {
             test_cases.emplace_back(new test_lightning_indexer(128, 64, kv, 32, 4, 1, type_K));
         }
     }
+
+    for (int64_t n : {1, 32}) {
+        test_cases.emplace_back(new test_bf16_mul_mat_upload(n, false));
+        test_cases.emplace_back(new test_bf16_mul_mat_upload(n, true));
+    }
+    test_cases.emplace_back(new test_bf16_mul_mat_upload(32, false, true));
+    test_cases.emplace_back(new test_bf16_mul_mat_upload(32, true, true));
 
     for (ggml_type type : {GGML_TYPE_MXFP4, GGML_TYPE_NVFP4}) {
         test_cases.emplace_back(new test_repacked_mul_mat(type, 256, 1, 512));

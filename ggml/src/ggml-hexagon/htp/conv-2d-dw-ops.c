@@ -86,10 +86,10 @@ static void conv_dw_channels_point(const struct htp_ops_context *octx, uint32_t 
                     memcpy(halfs, kp, VLEN_FP32 * sizeof(__fp16));
                     kv = Q6_V_lo_W(hvx_vec_f16_to_f32(*(const HVX_Vector *)halfs));
                 }
-                sum = Q6_Vqf32_vadd_Vqf32Vqf32(sum, Q6_Vqf32_vmpy_VsfVsf(xv, kv));
+                sum = hvx_vec_add_f32_f32(sum, hvx_vec_mul_f32_f32(xv, kv));
             }
         }
-        *(HVX_UVector *)conv_dw_output(y, ox, oy, c, n) = Q6_Vsf_equals_Vqf32(sum);
+        *(HVX_UVector *)conv_dw_output(y, ox, oy, c, n) = sum;
     }
     for (; c < x->ne[2]; ++c) {
         *conv_dw_output(y, ox, oy, c, n) = conv_dw_scalar(octx, ox, oy, c, n);
@@ -126,10 +126,10 @@ static void conv_dw_planar_row(const struct htp_ops_context *octx, uint32_t oy, 
                     xv = *(const HVX_Vector *)tile;
                 }
                 const HVX_Vector kv = hvx_vec_splat_f32(conv_dw_weight(k, kx, ky, c));
-                sum = Q6_Vqf32_vadd_Vqf32Vqf32(sum, Q6_Vqf32_vmpy_VsfVsf(xv, kv));
+                sum = hvx_vec_add_f32_f32(sum, hvx_vec_mul_f32_f32(xv, kv));
             }
         }
-        *(HVX_UVector *)conv_dw_output(y, ox, oy, c, n) = Q6_Vsf_equals_Vqf32(sum);
+        *(HVX_UVector *)conv_dw_output(y, ox, oy, c, n) = sum;
     }
     for (; ox < y->ne[0]; ++ox) {
         *conv_dw_output(y, ox, oy, c, n) = conv_dw_scalar(octx, ox, oy, c, n);
@@ -225,6 +225,29 @@ static void conv_dw_thread(unsigned int nth, unsigned int ith, void *data) {
     htp_trace_event_stop(tr, HTP_TRACE_EVT_HVX_COMP, start);
 }
 
+static void conv_dw_convert_weights(float * dst, const __fp16 * src, size_t count) {
+    for (size_t i = 0; i < count; ++i) {
+        dst[i] = (float) src[i];
+    }
+}
+
+static void conv_dw_prepare_weights(struct htp_ops_context * local, struct htp_tensor * weights) {
+    const struct htp_tensor * src = local->src[0];
+    const size_t count = (size_t) src->ne[0] * src->ne[1] * src->ne[3];
+    if (src->type != HTP_TYPE_F16 || count > local->ctx->vtcm_size / sizeof(float)) {
+        return;
+    }
+    *weights = *src;
+    weights->type = HTP_TYPE_F32;
+    weights->data = (uintptr_t) local->ctx->vtcm_base;
+    weights->size = count * sizeof(float);
+    for (uint32_t i = 0; i < HTP_OP_MAX_DIMS; ++i) {
+        weights->nb[i] = src->nb[i] * (sizeof(float) / sizeof(__fp16));
+    }
+    conv_dw_convert_weights((float *) local->ctx->vtcm_base, (const __fp16 *) src->data, count);
+    local->src[0] = weights;
+}
+
 int op_conv_2d_dw(struct htp_ops_context *octx) {
     const struct htp_tensor *k = octx->src[0];
     const struct htp_tensor *x = octx->src[1];
@@ -247,7 +270,10 @@ int op_conv_2d_dw(struct htp_ops_context *octx) {
     if (threads == 0) {
         return HTP_STATUS_OK;
     }
-    struct htp_conv_dw_context dc = {octx, rows, (rows + threads - 1) / threads, channels_contiguous, planar_stride2_3x3};
+    struct htp_ops_context local = *octx;
+    struct htp_tensor weights;
+    conv_dw_prepare_weights(&local, &weights);
+    struct htp_conv_dw_context dc = {&local, rows, (rows + threads - 1) / threads, channels_contiguous, planar_stride2_3x3};
     work_queue_run(octx->ctx->work_queue, conv_dw_thread, &dc, threads);
     return HTP_STATUS_OK;
 }

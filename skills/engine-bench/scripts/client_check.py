@@ -19,7 +19,10 @@ e.g. the warm-up curl) a non-zero exit code writes one row with the reason given
 error-like line of that log is added to each reason, since the client alone often sees only a dropped connection.
 Row: {"label", "step", "error" (the reason), "at" (local time, ISO 8601), ...}.
 """
-import json, re, sys, time
+import json
+import re
+import sys
+import time
 
 PROMPTS = ["code", "rewrite", "story", "explain"]  # bench_client.py's spec prompts, in the order it runs them
 SERVER_ERR = re.compile(r"exceeds|out of memory|OutOfMemory|CUDA error|GGML_ASSERT|\bERROR\b|Error: |[Aa]bort|Killed|"
@@ -33,7 +36,7 @@ def server_hint(path):
             lines = f.read().splitlines()[-500:]
     except (OSError, TypeError):
         return ""
-    hits = [l.strip() for l in lines if SERVER_ERR.search(l)]
+    hits = [line.strip() for line in lines if SERVER_ERR.search(line)]
     return f"; server log: {hits[-1][:200]}" if hits else ""
 
 
@@ -120,7 +123,7 @@ def main():
             row = {**row, "error": row["error"] + hint, "at": now, **fields}
             f.write(json.dumps({k: v for k, v in row.items() if v not in ("", None)}) + "\n")
     for row in new:
-        print(f"error row: {row['label']} {row['step']}: {row['error'][:160]}")
+        print(f"error row: {row['label']} {row['step']}: {row['error'][:160]}")  # noqa: NP100
 
 
 if __name__ == "__main__":

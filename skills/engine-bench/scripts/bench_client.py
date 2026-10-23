@@ -5,7 +5,15 @@ Uses /v1/completions with a hand-formatted Qwen chat prompt so both servers see
 identical tokens (no chat-template differences).
 """
 import zlib
-import argparse, glob, http.client, json, os, random, statistics, sys, threading, time
+import argparse
+import glob
+import http.client
+import json
+import os
+import random
+import statistics
+import threading
+import time
 from urllib.parse import urlparse
 
 EOS_IDS = [151643, 151645]  # Qwen <|endoftext|>, <|im_end|>
@@ -64,7 +72,7 @@ SPEC_PROMPTS = {
 }
 
 
-def request(url, body, timeout=1800):
+def request(url, body, timeout=1800) -> dict:
     u = urlparse(url)
     conn = http.client.HTTPConnection(u.hostname, u.port, timeout=timeout)
     t0 = time.perf_counter()
@@ -76,7 +84,6 @@ def request(url, body, timeout=1800):
     n_chunks = 0
     usage = None
     text = []
-    buf = b""
     while True:
         line = resp.readline()
         if not line:
@@ -108,8 +115,8 @@ def request(url, body, timeout=1800):
 
 
 def base_body(args, prompt, max_tokens, ban_eos):
-    b = dict(prompt=prompt, max_tokens=max_tokens, temperature=0.0, top_p=1.0, stream=True,
-             stream_options={"include_usage": True}, cache_prompt=False)
+    b: dict = dict(prompt=prompt, max_tokens=max_tokens, temperature=0.0, top_p=1.0, stream=True,
+                   stream_options={"include_usage": True}, cache_prompt=False)
     if args.model:
         b["model"] = args.model
     if ban_eos and not args.long_output:
@@ -136,7 +143,8 @@ def run_conc(args):
                 with lock:
                     if idx[0] >= nreq:
                         return
-                    i = idx[0]; idx[0] += 1
+                    i = idx[0]
+                    idx[0] += 1
                 r = request(args.url, base_body(args, prompts[i], args.gen, True))
                 with lock:
                     recs.append(r)
@@ -156,7 +164,7 @@ def run_conc(args):
                    ttft_mean_s=round(statistics.mean(ttft), 3), ttft_p90_s=round(sorted(ttft)[int(0.9 * (len(ttft) - 1))], 3),
                    per_req_tps_mean=round(statistics.mean(dec), 1) if dec else None,
                    short_outputs=sum(1 for r in recs if r["n_tok"] < args.gen))
-        print(json.dumps(row), flush=True)
+        print(json.dumps(row), flush=True)  # noqa: NP100
         results.append(row)
     return results
 
@@ -165,7 +173,7 @@ def run_spec(args):
     corpus = load_corpus(args.corpus)
     rnd = random.Random(7)
     off = rnd.randrange(0, len(corpus) - 4000)
-    prompts = dict(SPEC_PROMPTS)
+    prompts: dict[str, str] = {k: v or "" for k, v in SPEC_PROMPTS.items()}
     prompts["rewrite"] = "Rewrite the following text verbatim, but fix any typos and convert headings to bold text:\n\n" + corpus[off:off + 3000]
     request(args.url, base_body(args, fmt("Hello, say hi."), 16, False))
     results = []
@@ -179,8 +187,9 @@ def run_spec(args):
                        dec_tps=round(dec_tps, 1) if dec_tps else None,
                        text_hash=hash(r["text"]) & 0xFFFFFFFF, text_crc=zlib.crc32(r["text"].encode()), text_head=r["text"][:60])
             if r["timings"] and "draft_n" in r["timings"]:
-                row["draft_n"] = r["timings"].get("draft_n"); row["draft_acc"] = r["timings"].get("draft_n_accepted")
-            print(json.dumps(row), flush=True)
+                row["draft_n"] = r["timings"].get("draft_n")
+                row["draft_acc"] = r["timings"].get("draft_n_accepted")
+            print(json.dumps(row), flush=True)  # noqa: NP100
             results.append(row)
     return results
 

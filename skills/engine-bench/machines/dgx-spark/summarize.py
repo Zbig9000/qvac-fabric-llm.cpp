@@ -16,7 +16,13 @@ every conc, concspec and depth row whose requests stopped before --gen tokens (l
 short of total), and `short_outputs` is their sum. `jobs` maps each label to the time its job started (weekly.log), so
 drops, errors and short outputs can be matched to a time window.
 """
-import argparse, json, os, re, statistics, subprocess, time
+import argparse
+import json
+import os
+import re
+import statistics
+import subprocess
+import time
 from collections import defaultdict
 
 MACHINE = "dgx-spark"
@@ -173,6 +179,7 @@ def main():
 
     # Spark: greedy speculation should reproduce the same engine's text without it; engines on one weights file should agree
     checks = []
+
     def compare(key, ref):
         pairs = [(v, texts[ref][k]) for k, v in texts.get(key, {}).items() if k in texts.get(ref, {})]
         if pairs:
@@ -183,8 +190,11 @@ def main():
             compare((e, m, prof), (AR_OF.get(e, e), "ar", prof))
     for x, y in (("fab", "up"), ("sglang", "vllm"), ("vllm", "up")):
         compare((x, "ar", "standard"), (y, "ar", "standard"))
-    concspec_acc = {f"{k[1]}/{k[2]}" + ("" if len(k) < 4 else f"/{k[3]}"): counters_acc(k[1], k[2], "-".join(k))
-                    for k in {tuple(l.split("-")) for l in stats if l.startswith("concspec-")} if k[1] in ("vllm", "sglang")}
+    concspec_acc = {}
+    for lab in sorted({lab for lab in stats if lab.startswith("concspec-")}):
+        k = lab.split("-")
+        if k[1] in ("vllm", "sglang"):
+            concspec_acc[f"{k[1]}/{k[2]}" + ("" if len(k) < 4 else f"/{k[3]}")] = counters_acc(k[1], k[2], lab)
 
     status = a.status
     missing = [f"{k}:{e}/{m}" for k, e, m in EXPECTED if (k, e, m) not in seen]
@@ -212,7 +222,7 @@ def main():
         "finished": time.strftime("%a %b %d %H:%M:%S %Z %Y"),
         "hardware": hardware(),
         "versions": versions(run),
-        "updates": [l.rstrip("\n") for l in open(upd)] if os.path.exists(upd) else [],
+        "updates": [line.rstrip("\n") for line in open(upd)] if os.path.exists(upd) else [],
         "single": single,
         "conc": sorted(conc, key=lambda r: (r["profile"], r["engine"], r["mode"], r["prompt"] or 0, r["c"])),
         "spec": sorted(spec_rows, key=lambda r: (r["profile"], r["engine"], r["mode"])),
@@ -230,7 +240,7 @@ def main():
     }
     with open(os.path.join(run, "summary.json"), "w") as f:
         json.dump(summary, f, indent=1)
-    print(json.dumps({k: summary[k] for k in ("date", "status", "missing")}))
+    print(json.dumps({k: summary[k] for k in ("date", "status", "missing")}))  # noqa: NP100
 
 
 if __name__ == "__main__":

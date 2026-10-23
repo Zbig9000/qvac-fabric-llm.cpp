@@ -10,7 +10,10 @@ every metric that moved by more than the threshold is listed with its job's star
 version changed. Drops that cluster in one time window, or hit engines whose version did not change, usually mean
 another user loaded the shared machine: re-run those jobs before trusting them.
 """
-import argparse, json, os, sys
+import argparse
+import json
+import os
+import sys
 
 MODES = ["ar", "mtp", "dflash2"]
 MODE_NAME = {"ar": "no speculation", "mtp": "MTP", "dflash2": "DFlash2"}

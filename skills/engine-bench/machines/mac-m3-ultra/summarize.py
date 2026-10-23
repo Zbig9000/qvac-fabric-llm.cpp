@@ -14,7 +14,13 @@ every conc, concspec and depth row whose requests stopped before --gen tokens (l
 short of total), and `short_outputs` is their sum. `jobs` maps each label to the time its server came up (weekly.log),
 so drops, errors and short outputs can be matched to a time window.
 """
-import argparse, json, os, re, statistics, subprocess, time
+import argparse
+import json
+import os
+import re
+import statistics
+import subprocess
+import time
 from collections import defaultdict
 
 MACHINE = "mac-m3-ultra"
@@ -30,10 +36,10 @@ DRAFT = {("up", "mtp"): "GGUF MTP layer", ("fab", "mtp"): "GGUF MTP layer",
 # the matrix weekly.sh runs: (kind, engine, mode)
 EXPECTED = [("conc", e, m) for e, m in (("omlx", "ar"), ("sglang", "ar"), ("splash", "dflash2"), ("fab", "ar"), ("up", "ar"), ("mlx", "ar"))] \
     + [("spec", e, m) for e, m in (("up", "ar"), ("up", "mtp"), ("up", "dflash2"), ("fab", "ar"), ("fab", "mtp"), ("fab", "dflash2"),
-                                     ("omlx", "ar"), ("omlx", "mtp"), ("omlx", "dflash2"), ("splash", "dflash2"), ("mlx", "ar"), ("sglang", "ar"))] \
+                                   ("omlx", "ar"), ("omlx", "mtp"), ("omlx", "dflash2"), ("splash", "dflash2"), ("mlx", "ar"), ("sglang", "ar"))] \
     + [("concspec", e, m) for e in ("up", "fab", "omlx") for m in ("mtp", "dflash2")] \
     + [("depth", e, m) for e, m in (("up", "ar"), ("fab", "ar"), ("omlx", "ar"), ("mlx", "ar"), ("sglang", "ar"), ("splash", "dflash2"),
-                                      ("up", "dflash2"), ("fab", "dflash2"), ("omlx", "dflash2"))]
+                                    ("up", "dflash2"), ("fab", "dflash2"), ("omlx", "dflash2"))]
 PROMPTS = ["code", "rewrite", "story", "explain"]
 
 
@@ -173,7 +179,7 @@ def main():
         "finished": time.strftime("%a %b %d %H:%M:%S %Z %Y"),
         "hardware": hardware(),
         "versions": versions(run),
-        "updates": [l.rstrip("\n") for l in open(upd)] if os.path.exists(upd) else [],
+        "updates": [line.rstrip("\n") for line in open(upd)] if os.path.exists(upd) else [],
         "single": single,
         "conc": sorted(conc, key=lambda r: (r["profile"], r["engine"], r["mode"], r["prompt"] or 0, r["c"])),
         "spec": sorted(spec_rows, key=lambda r: (r["profile"], r["engine"], r["mode"])),
@@ -185,7 +191,7 @@ def main():
     }
     with open(os.path.join(run, "summary.json"), "w") as f:
         json.dump(summary, f, indent=1)
-    print(json.dumps({k: summary[k] for k in ("date", "status", "missing")}))
+    print(json.dumps({k: summary[k] for k in ("date", "status", "missing")}))  # noqa: NP100
 
 
 if __name__ == "__main__":

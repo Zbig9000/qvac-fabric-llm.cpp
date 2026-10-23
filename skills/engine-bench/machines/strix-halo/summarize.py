@@ -16,7 +16,13 @@ an "ok" run "partial". `short_by_label` names every conc, concspec and depth row
 tokens (label, concurrency, mean prompt tokens, short of total), and `short_outputs` is their sum. `jobs` maps each
 label to the time its server came up (weekly.log), so drops, errors and short outputs can be matched to a time window.
 """
-import argparse, json, os, re, statistics, subprocess, time
+import argparse
+import json
+import os
+import re
+import statistics
+import subprocess
+import time
 from collections import defaultdict
 
 MACHINE = "strix-halo"
@@ -204,7 +210,7 @@ def main():
         "finished": time.strftime("%a %b %d %H:%M:%S %Z %Y"),
         "hardware": hardware(),
         "versions": versions,
-        "updates": [l.rstrip("\n") for l in open(upd)] if os.path.exists(upd) else [],
+        "updates": [line.rstrip("\n") for line in open(upd)] if os.path.exists(upd) else [],
         "single": single,
         "conc": sorted(conc, key=lambda r: (r["profile"], r["engine"], r["backend"], r["mode"], r["prompt"] or 0, r["c"])),
         "spec": sorted(spec_rows, key=lambda r: (r["profile"], r["engine"], r["backend"], r["mode"])),
@@ -217,7 +223,7 @@ def main():
     }
     with open(os.path.join(run, "summary.json"), "w") as f:
         json.dump(summary, f, indent=1)
-    print(json.dumps({k: summary[k] for k in ("date", "status", "missing")}))
+    print(json.dumps({k: summary[k] for k in ("date", "status", "missing")}))  # noqa: NP100
 
 
 if __name__ == "__main__":

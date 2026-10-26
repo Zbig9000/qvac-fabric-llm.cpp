@@ -1408,13 +1408,10 @@ void llama_context::set_abort_callback(bool (*abort_callback)(void * data), void
 void llama_context::set_embeddings(bool value) {
     LLAMA_LOG_DEBUG("%s: value = %d\n", __func__, value);
 
-    // the toggle changes the graph shape (pooled: logits only; pooling NONE: the reserve graph outputs all tokens,
-    // which crashed ggml_gallocr on the first /completion), so re-reserve on every toggle
-    if (cparams.embeddings != value) {
-        sched_need_reserve = true;
-    }
-
     cparams.embeddings = value;
+
+    // TODO: not sure yet if we want to reserve here
+    //sched_need_reserve = true;
 }
 
 void llama_context::set_embeddings_nextn(bool value, bool masked) {

@@ -74,12 +74,17 @@ static void * track_realloc(void * ptr, size_t newsz) {
 #define STBI_REALLOC(p, newsz)             track_realloc(p, newsz)
 #define STBI_REALLOC_SIZED(p, oldsz, newsz) track_realloc(p, newsz)
 #define STBI_FREE(p)                       track_free(p)
-#define STBI_ONLY_PNG
+// Same configuration as tools/mtmd/mtmd-helper.cpp, so this compiles the decoder mtmd ships.
 #define STB_IMAGE_IMPLEMENTATION
-// stb casts away const throughout; that is upstream code, not something this test checks.
+// stb casts away const throughout; that is upstream code, not something this test checks. gcc 14
+// also reports tc16 in stbi__parse_png_file as maybe-uninitialized once it inlines
+// stbi__compute_transparency16 into it, a false positive clang does not raise.
 #if defined(__GNUC__)
 #    pragma GCC diagnostic push
 #    pragma GCC diagnostic ignored "-Wcast-qual"
+#    if !defined(__clang__)
+#        pragma GCC diagnostic ignored "-Wmaybe-uninitialized"
+#    endif
 #endif
 #include "stb/stb_image.h"
 #if defined(__GNUC__)

@@ -3,10 +3,6 @@ name: Server
 on:
   workflow_dispatch: # allows manual triggering
     inputs:
-      sha:
-        description: 'Commit SHA1 to build'
-        required: false
-        type: string
       slow_tests:
         description: 'Run slow tests'
         required: true
@@ -43,6 +39,9 @@ on:
       'tools/server/**.*'
     ]
 
+permissions:
+  contents: read
+
 env:
   LLAMA_ARG_LOG_COLORS: 1
   LLAMA_ARG_LOG_PREFIX: 1
@@ -66,7 +65,7 @@ env:
 # `ubuntu`, 5th of `windows`) are exactly the long ones.
 # See QVAC-24627.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || (github.event.inputs.sha && format('{0}-slow{1}', github.event.inputs.sha, github.event.inputs.slow_tests)) || (github.ref == 'refs/heads/master' && github.run_id) || github.ref }}
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || (github.ref == 'refs/heads/master' && github.run_id) || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -93,7 +92,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          ref: ${{ github.event.inputs.sha || github.event.pull_request.head.sha || github.sha || github.head_ref || github.ref_name }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.24
@@ -165,6 +164,9 @@ jobs:
           SLOW_TESTS=1 ./tests.sh
 
   windows:
+    permissions:
+      contents: read
+      actions: write
     runs-on: windows-2025
 
     steps:
@@ -173,7 +175,7 @@ jobs:
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
-          ref: ${{ github.event.inputs.sha || github.event.pull_request.head.sha || github.sha || github.head_ref || github.ref_name }}
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: ccache
         uses: ggml-org/ccache-action@v1.2.24

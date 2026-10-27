@@ -40,6 +40,9 @@ on:
       '**/*.inc'
     ]
 
+permissions:
+  contents: read
+
 # QVAC divergence from upstream: dedupe per PR and per branch, so a re-push or
 # re-dispatch supersedes the in-flight run. The default branch deliberately
 # keeps upstream's run_id behaviour — master pushes must not cancel each other,
@@ -253,6 +256,9 @@ jobs:
           ./bin/llama-completion -m stories260K.gguf -p "One day, Lily met a Shoggoth" -n 500 -c 256
 
   windows:
+    permissions:
+      contents: read
+      actions: write
     name: windows / ${{ matrix.build }}
     runs-on: windows-2025
 

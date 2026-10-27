@@ -18,6 +18,9 @@ on:
       - 'gguf-v*'           # Push events to every version tag
 
 
+permissions:
+  contents: read
+
 jobs:
   deploy:
 

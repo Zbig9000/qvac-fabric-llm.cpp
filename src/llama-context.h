@@ -11,10 +11,6 @@
 #include "ggml-cpp.h"
 #include "ggml-opt.h"
 
-#ifdef LLAMA_USE_COREML
-#include "llama-coreml.h"
-#endif
-
 #include <array>
 #include <atomic>
 #include <map>
@@ -22,6 +18,7 @@
 #include <vector>
 
 struct llama_model;
+struct llama_coreml_embedding;
 class llama_batch_allocr;
 class llama_moe_cache;
 
@@ -333,10 +330,11 @@ private:
     llama_cross cross; // TODO: tmp for handling cross-attention - need something better probably
 
     llama_memory_ptr memory;
-#ifdef LLAMA_USE_COREML
-    std::unique_ptr<llama_coreml_embedding, decltype(&llama_coreml_embedding_free)> coreml{nullptr, llama_coreml_embedding_free};
+    std::unique_ptr<llama_coreml_embedding, void (*)(llama_coreml_embedding *)> coreml{nullptr, nullptr};
+    bool coreml_contract_matches() const;
+    bool coreml_ubatch_eligible() const;
+    bool run_coreml_probe(llama_coreml_embedding * candidate);
     bool encode_coreml(const llama_ubatch & ubatch);
-#endif
     std::unique_ptr<llama_moe_cache> moe_cache;
 
     // decode output (2-dimensional array: [n_outputs][n_vocab])

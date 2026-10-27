@@ -13715,6 +13715,7 @@ static std::vector<std::unique_ptr<test_case>> make_test_cases_eval() {
     std::default_random_engine rng(0);
 
     // unary ops
+    // TODO: add GGML_UNARY_OP_SOFTPLUS test that is sensitive to using `log1p(exp(x))` vs `log(exp(x) + 1)`
     for (ggml_type type : {GGML_TYPE_F16, GGML_TYPE_F32}) {
         for (int v : {0, 1}) {
             for (int op = 0; op < GGML_UNARY_OP_COUNT; op++) {
@@ -13976,6 +13977,8 @@ static std::vector<std::unique_ptr<test_case>> make_test_cases_eval() {
 
     // im2col 1D
     test_cases.emplace_back(new test_im2col(GGML_TYPE_F32, GGML_TYPE_F32, GGML_TYPE_F32, {3000, 128, 1, 1}, {3, 128, 1280, 1}, 1, 0, 1, 0, 1, 0, false));
+    // deepseek4v / deepseek41v aligner: 3x3 stride-3 unfold (F.unfold == im2col)
+    test_cases.emplace_back(new test_im2col(GGML_TYPE_F32, GGML_TYPE_F32, GGML_TYPE_F32, {48, 33, 1024, 1}, {3, 3, 1024, 1}, 3, 3, 0, 0, 1, 1, true));
     test_cases.emplace_back(new test_im2col(GGML_TYPE_F32, GGML_TYPE_F16, GGML_TYPE_F32, {3000, 128, 1, 1}, {3, 128, 1280, 1}, 1, 0, 1, 0, 1, 0, false));
     test_cases.emplace_back(new test_im2col(GGML_TYPE_F32, GGML_TYPE_F16, GGML_TYPE_F16, {3000, 128, 1, 1}, {3, 128, 1280, 1}, 1, 0, 1, 0, 1, 0, false));
     test_cases.emplace_back(new test_im2col(GGML_TYPE_F32, GGML_TYPE_F16, GGML_TYPE_F16, {3000, 384, 1, 1}, {3, 384,  384, 1}, 1, 0, 1, 0, 1, 0, false));

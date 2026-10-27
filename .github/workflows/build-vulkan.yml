@@ -24,6 +24,9 @@ on:
       'ggml/src/ggml-vulkan/**'
     ]
 
+permissions:
+  contents: read
+
 # QVAC divergence from upstream: dedupe per PR and per branch, so a re-push or
 # re-dispatch supersedes the in-flight run. The default branch deliberately
 # keeps upstream's run_id behaviour — master pushes must not cancel each other,
@@ -197,6 +200,9 @@ jobs:
           exit $CTEST_EXIT
 
   windows:
+    permissions:
+      contents: read
+      actions: write
     runs-on: windows-2025
 
     env:

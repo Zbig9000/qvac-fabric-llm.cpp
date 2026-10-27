@@ -17,6 +17,9 @@ on:
       'scripts/sync_vendor.py'
     ]
 
+permissions:
+  contents: read
+
 # QVAC addition: dedupe per PR and per branch, so a re-push or re-dispatch
 # supersedes the in-flight run. The default branch is exempt on purpose —
 # master pushes must not cancel each other. See QVAC-24627.

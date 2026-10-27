@@ -27,6 +27,9 @@ on:
       '**/*.glsl'
     ]
 
+permissions:
+  contents: read
+
 env:
   GH_TOKEN: ${{ github.token }}
   BRANCH_NAME: ${{ github.head_ref || github.ref_name }}
@@ -453,6 +456,9 @@ jobs:
           key: release-ubuntu-${{ matrix.os }}-cuda-${{ matrix.label }}-${{ matrix.build }}
 
   android-arm64:
+    permissions:
+      contents: read
+      actions: write
     needs: [check-release, ui-build]
     if: ${{ needs.check-release.outputs.should_release == 'true' }}
 
@@ -777,6 +783,9 @@ jobs:
           key: release-ubuntu-24.04-openvino-release-no-preset-v1
 
   windows-openvino:
+    permissions:
+      contents: read
+      actions: write
     needs: [check-release, ui-build]
     if: ${{ needs.check-release.outputs.should_release == 'true' }}
 
@@ -976,6 +985,9 @@ jobs:
   # note: builds only the ggml-hip backend - llama-server is injected from the
   #       windows-cpu zip during the release "Merge artifacts" step
   windows-rocm:
+    permissions:
+      contents: read
+      actions: write
     needs: [check-release]
     if: ${{ needs.check-release.outputs.should_release == 'true' }}
 
@@ -1334,6 +1346,9 @@ jobs:
   # note: builds only the ggml-sycl backend - llama-server is injected from the
   #       windows-cpu zip during the release "Merge artifacts" step
   windows-sycl:
+    permissions:
+      contents: read
+      actions: write
     needs: [check-release]
     if: ${{ needs.check-release.outputs.should_release == 'true' }}
 
@@ -1438,6 +1453,9 @@ jobs:
           key: release-windows-2022-x64-sycl
 
   ubuntu-24-sycl:
+    permissions:
+      contents: read
+      actions: write
     needs: [check-release, ui-build]
     if: ${{ needs.check-release.outputs.should_release == 'true' }}
 

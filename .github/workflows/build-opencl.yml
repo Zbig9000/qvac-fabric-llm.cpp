@@ -23,6 +23,9 @@ on:
       'ggml/src/ggml-opencl/**'
     ]
 
+permissions:
+  contents: read
+
 # QVAC divergence from upstream: dedupe per PR and per branch, so a re-push or
 # re-dispatch supersedes the in-flight run. The default branch deliberately
 # keeps upstream's run_id behaviour — master pushes must not cancel each other,
@@ -40,6 +43,9 @@ env:
 
 jobs:
   windows-2025-opencl-adreno:
+    permissions:
+      contents: read
+      actions: write
     runs-on: windows-2025
 
     steps:

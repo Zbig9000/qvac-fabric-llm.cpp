@@ -162,21 +162,26 @@ static bytes zlib_stored(const bytes & raw) {
 
 struct png_spec {
     int   w, h;
-    int   color;  // PNG color type: 0 gray, 2 RGB, 3 palette, 6 RGBA
+    int   color;  // PNG color type: 0 gray, 2 RGB, 3 palette, 4 gray+alpha, 6 RGBA
     int   depth;
     bool  interlaced;
-    bytes plte;  // RGB triplets, palette only
-    bytes trns;  // alpha per palette entry, palette only
+    bytes plte;          // RGB triplets, palette only
+    bytes trns;          // alpha per palette entry, palette only
+    bool  cgbi = false;  // Apple CgBI: raw deflate with no zlib header or adler32
 };
 
 static int channels_of(int color) {
-    return color == 2 ? 3 : color == 6 ? 4 : 1;
+    return color == 2 ? 3 : color == 4 ? 2 : color == 6 ? 4 : 1;
 }
 
 static bytes png_wrap(const png_spec & s, const bytes & zstream) {
     static const uint8_t sig[8] = { 137, 80, 78, 71, 13, 10, 26, 10 };
     bytes                out(sig, sig + 8);
-    bytes                ihdr;
+    if (s.cgbi) {
+        // stb only checks that the chunk is there; its payload is ignored.
+        put_chunk(out, "CgBI", bytes(4, 0));
+    }
+    bytes ihdr;
     put_be32(ihdr, (uint32_t) s.w);
     put_be32(ihdr, (uint32_t) s.h);
     ihdr.push_back((uint8_t) s.depth);
@@ -191,7 +196,11 @@ static bytes png_wrap(const png_spec & s, const bytes & zstream) {
     if (!s.trns.empty()) {
         put_chunk(out, "tRNS", s.trns);
     }
-    put_chunk(out, "IDAT", zstream);
+    if (s.cgbi) {
+        put_chunk(out, "IDAT", bytes(zstream.begin() + 2, zstream.end() - 4));
+    } else {
+        put_chunk(out, "IDAT", zstream);
+    }
     put_chunk(out, "IEND", bytes());
     return out;
 }
@@ -438,6 +447,12 @@ static png_spec palette_spec(int w, int h, int depth, bool interlaced = false) {
     return s;
 }
 
+static png_spec cgbi_spec(int w, int h) {
+    png_spec s = spec(w, h, 6, 8);
+    s.cgbi     = true;
+    return s;
+}
+
 static int decode_file(const char * path) {
     FILE * f = std::fopen(path, "rb");
     if (!f) {
@@ -526,6 +541,9 @@ int main(int argc, char ** argv) {
         for (const auto & sz : sizes) {
             expect_roundtrip("gray8", spec(sz[0], sz[1], 0, 8));
             expect_roundtrip("gray1", spec(sz[0], sz[1], 0, 1));
+            expect_roundtrip("gray2", spec(sz[0], sz[1], 0, 2));
+            expect_roundtrip("graya8", spec(sz[0], sz[1], 4, 8));
+            expect_roundtrip("graya16", spec(sz[0], sz[1], 4, 16));
             expect_roundtrip("rgb8", spec(sz[0], sz[1], 2, 8));
             expect_roundtrip("rgba8", spec(sz[0], sz[1], 6, 8));
             expect_roundtrip("palette8+trns", palette_spec(sz[0], sz[1], 8));
@@ -534,6 +552,9 @@ int main(int argc, char ** argv) {
         }
         // more than one stored block
         expect_roundtrip("rgb8", spec(160, 200, 2, 8));
+        // CgBI goes through the same bounded decode without the zlib header. stb leaves BGR
+        // and premultiplied alpha alone unless stbi_convert_iphone_png_to_rgb is set.
+        expect_roundtrip("cgbi rgba8", cgbi_spec(7, 5));
     }
 
     // c. Adam7 round trips; these sizes leave some passes empty
@@ -552,7 +573,9 @@ int main(int argc, char ** argv) {
         }
         // sub-byte rows per pass
         expect_roundtrip("gray1", spec(17, 3, 0, 1, true));
+        expect_roundtrip("gray2", spec(17, 3, 0, 2, true));
         expect_roundtrip("palette4+trns", palette_spec(9, 9, 4, true));
+        expect_roundtrip("graya8", spec(5, 3, 4, 8, true));
         expect_roundtrip("rgb16", spec(5, 3, 2, 16, true));
     }
 
@@ -567,6 +590,7 @@ int main(int argc, char ** argv) {
             { "rgb8 7x5", spec(7, 5, 2, 8) },
             { "adam7 gray1 17x3", spec(17, 3, 0, 1, true) },
             { "adam7 palette4+trns 9x9", palette_spec(9, 9, 4, true) },
+            { "cgbi rgba8 7x5", cgbi_spec(7, 5) },
         };
 
         for (const auto & c : cases) {

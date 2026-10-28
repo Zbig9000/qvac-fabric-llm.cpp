@@ -44,7 +44,7 @@ static void track_free(void * ptr) {
         return;
     }
     unsigned char * p = (unsigned char *) ptr - HDR;
-    size_t sz;
+    size_t          sz;
     std::memcpy(&sz, p, sizeof(sz));
     g_live -= sz;
     std::free(p);
@@ -55,7 +55,7 @@ static void * track_realloc(void * ptr, size_t newsz) {
         return track_malloc(newsz);
     }
     unsigned char * p = (unsigned char *) ptr - HDR;
-    size_t oldsz;
+    size_t          oldsz;
     std::memcpy(&oldsz, p, sizeof(oldsz));
     unsigned char * q = (unsigned char *) std::realloc(p, newsz + HDR);
     if (!q) {
@@ -70,10 +70,10 @@ static void * track_realloc(void * ptr, size_t newsz) {
 }
 
 // stb requires STBI_REALLOC alongside STBI_REALLOC_SIZED; it calls the sized form.
-#define STBI_MALLOC(sz)                    track_malloc(sz)
-#define STBI_REALLOC(p, newsz)             track_realloc(p, newsz)
+#define STBI_MALLOC(sz)                     track_malloc(sz)
+#define STBI_REALLOC(p, newsz)              track_realloc(p, newsz)
 #define STBI_REALLOC_SIZED(p, oldsz, newsz) track_realloc(p, newsz)
-#define STBI_FREE(p)                       track_free(p)
+#define STBI_FREE(p)                        track_free(p)
 // Same configuration as tools/mtmd/mtmd-helper.cpp, so this compiles the decoder mtmd ships.
 #define STB_IMAGE_IMPLEMENTATION
 // stb casts away const throughout; that is upstream code, not something this test checks. gcc 14
@@ -143,7 +143,7 @@ static void put_chunk(bytes & out, const char * type, const bytes & data) {
 
 // zlib stream of stored blocks: header 0x78 0x01, blocks of up to 65535 bytes, adler32.
 static bytes zlib_stored(const bytes & raw) {
-    bytes z = { 0x78, 0x01 };
+    bytes  z   = { 0x78, 0x01 };
     size_t off = 0;
     do {
         const size_t n     = raw.size() - off < 65535 ? raw.size() - off : 65535;
@@ -161,10 +161,10 @@ static bytes zlib_stored(const bytes & raw) {
 }
 
 struct png_spec {
-    int w, h;
-    int color;  // PNG color type: 0 gray, 2 RGB, 3 palette, 6 RGBA
-    int depth;
-    bool interlaced;
+    int   w, h;
+    int   color;  // PNG color type: 0 gray, 2 RGB, 3 palette, 6 RGBA
+    int   depth;
+    bool  interlaced;
     bytes plte;  // RGB triplets, palette only
     bytes trns;  // alpha per palette entry, palette only
 };
@@ -175,8 +175,8 @@ static int channels_of(int color) {
 
 static bytes png_wrap(const png_spec & s, const bytes & zstream) {
     static const uint8_t sig[8] = { 137, 80, 78, 71, 13, 10, 26, 10 };
-    bytes out(sig, sig + 8);
-    bytes ihdr;
+    bytes                out(sig, sig + 8);
+    bytes                ihdr;
     put_be32(ihdr, (uint32_t) s.w);
     put_be32(ihdr, (uint32_t) s.h);
     ihdr.push_back((uint8_t) s.depth);
@@ -273,7 +273,7 @@ static bytes raw_scanlines(const png_spec & s) {
 // native channel count (4 for palette, which stb expands through PLTE and tRNS).
 static std::vector<uint32_t> expected_pixels(const png_spec & s) {
     std::vector<uint32_t> out;
-    const int n = channels_of(s.color);
+    const int             n = channels_of(s.color);
     for (int y = 0; y < s.h; y++) {
         for (int x = 0; x < s.w; x++) {
             if (s.color == 3) {
@@ -338,14 +338,14 @@ struct bit_writer {
 static bytes zlib_zero_bomb(size_t n_copies, size_t * inflated) {
     bit_writer bw;
     bw.out = { 0x78, 0x01 };
-    bw.bits(1, 1);       // BFINAL
-    bw.bits(1, 2);       // BTYPE 01, fixed Huffman
-    bw.code(0x30, 8);    // literal 0
+    bw.bits(1, 1);         // BFINAL
+    bw.bits(1, 2);         // BTYPE 01, fixed Huffman
+    bw.code(0x30, 8);      // literal 0
     for (size_t i = 0; i < n_copies; i++) {
         bw.code(0xC5, 8);  // length symbol 285 = 258
         bw.code(0x00, 5);  // distance code 0 = 1
     }
-    bw.code(0x00, 7);    // end of block, symbol 256
+    bw.code(0x00, 7);      // end of block, symbol 256
     bw.flush();
     const size_t n = 1 + 258 * n_copies;
     // adler32 of n zero bytes: s1 stays 1 and s2 gains 1 per byte.
@@ -362,14 +362,14 @@ static const char * reason() {
 }
 
 static void expect_roundtrip(const char * what, const png_spec & s) {
-    const bytes png = png_wrap(s, zlib_stored(raw_scanlines(s)));
+    const bytes                 png = png_wrap(s, zlib_stored(raw_scanlines(s)));
     const std::vector<uint32_t> exp = expected_pixels(s);
-    const int req = s.color == 3 ? 4 : channels_of(s.color);
-    int w = 0, h = 0, comp = 0;
-    bool ok = true;
+    const int                   req = s.color == 3 ? 4 : channels_of(s.color);
+    int                         w = 0, h = 0, comp = 0;
+    bool                        ok = true;
     if (s.depth == 16) {
         stbi_us * px = stbi_load_16_from_memory(png.data(), (int) png.size(), &w, &h, &comp, req);
-        ok = px && w == s.w && h == s.h;
+        ok           = px && w == s.w && h == s.h;
         for (size_t i = 0; ok && i < exp.size(); i++) {
             ok = px[i] == exp[i];
         }
@@ -379,7 +379,7 @@ static void expect_roundtrip(const char * what, const png_spec & s) {
         stbi_image_free(px);
     } else {
         stbi_uc * px = stbi_load_from_memory(png.data(), (int) png.size(), &w, &h, &comp, req);
-        ok = px && w == s.w && h == s.h;
+        ok           = px && w == s.w && h == s.h;
         for (size_t i = 0; ok && i < exp.size(); i++) {
             ok = px[i] == exp[i];
         }
@@ -397,7 +397,7 @@ static void expect_roundtrip(const char * what, const png_spec & s) {
 }
 
 static void expect_reject(const char * what, const bytes & png, const char * want_reason) {
-    int w = 0, h = 0, comp = 0;
+    int       w = 0, h = 0, comp = 0;
     stbi_uc * px = stbi_load_from_memory(png.data(), (int) png.size(), &w, &h, &comp, 3);
     if (px) {
         std::printf("FAIL %s: decoded as %dx%d, expected rejection with \"%s\"\n", what, w, h, want_reason);
@@ -424,7 +424,7 @@ static png_spec spec(int w, int h, int color, int depth, bool interlaced = false
 }
 
 static png_spec palette_spec(int w, int h, int depth, bool interlaced = false) {
-    png_spec s = spec(w, h, 3, depth, interlaced);
+    png_spec  s = spec(w, h, 3, depth, interlaced);
     const int n = 1 << (depth < 4 ? depth : 4);
     for (int i = 0; i < n; i++) {
         s.plte.push_back((uint8_t) (i * 16 + 3));
@@ -444,15 +444,15 @@ static int decode_file(const char * path) {
         std::printf("cannot open %s\n", path);
         return 1;
     }
-    bytes data;
+    bytes   data;
     uint8_t buf[1 << 16];
-    size_t n;
+    size_t  n;
     while ((n = std::fread(buf, 1, sizeof(buf), f)) > 0) {
         data.insert(data.end(), buf, buf + n);
     }
     std::fclose(f);
     g_live = g_peak = 0;
-    int w = 0, h = 0, comp = 0;
+    int       w = 0, h = 0, comp = 0;
     stbi_uc * px = stbi_load_from_memory(data.data(), (int) data.size(), &w, &h, &comp, 0);
     if (px) {
         std::printf("%s: %dx%d, decoded, tracked peak %zu bytes\n", path, w, h, g_peak);
@@ -472,20 +472,20 @@ int main(int argc, char ** argv) {
     // The bomb bit packing must be right, or the bomb case would pass for the wrong reason. A
     // small bomb decoded into an image of exactly its inflated size proves it against stb.
     {
-        size_t inflated = 0;
-        const bytes z = zlib_zero_bomb(8, &inflated);
-        png_spec s = spec((int) inflated - 1, 1, 0, 8);
-        const bytes png = png_wrap(s, z);
-        int w = 0, h = 0, comp = 0;
-        stbi_uc * px = stbi_load_from_memory(png.data(), (int) png.size(), &w, &h, &comp, 1);
-        bool ok = px && w == s.w && h == 1;
+        size_t      inflated = 0;
+        const bytes z        = zlib_zero_bomb(8, &inflated);
+        png_spec    s        = spec((int) inflated - 1, 1, 0, 8);
+        const bytes png      = png_wrap(s, z);
+        int         w = 0, h = 0, comp = 0;
+        stbi_uc *   px = stbi_load_from_memory(png.data(), (int) png.size(), &w, &h, &comp, 1);
+        bool        ok = px && w == s.w && h == 1;
         for (int i = 0; ok && i < w; i++) {
             ok = px[i] == 0;
         }
         stbi_image_free(px);
         if (!ok) {
-            std::printf("FAIL bomb encoder self-check: %zu-byte inflate into %dx1 gray: %s\n",
-                        inflated, s.w, px ? "wrong pixels" : reason());
+            std::printf("FAIL bomb encoder self-check: %zu-byte inflate into %dx1 gray: %s\n", inflated, s.w,
+                        px ? "wrong pixels" : reason());
             g_failures++;
         } else {
             std::printf("ok   bomb encoder self-check: %zu-byte stream inflates to %zu bytes\n", z.size(), inflated);
@@ -493,21 +493,23 @@ int main(int argc, char ** argv) {
     }
 
     // a. 1x1 RGB whose stream inflates to about 160 MB. Before QVAC-26299 stb doubled its
-    // buffer through the whole stream and this peaked at 256 MiB of tracked allocations, so
-    // anything above 128 MiB here means the bound is gone.
+    // buffer through the whole stream and this peaked at 256 MiB of tracked allocations; now
+    // the peak is the compressed stream itself, about 1 MB, so the limit is 4 MiB.
     {
-        size_t inflated = 0;
-        const bytes png = png_wrap(spec(1, 1, 2, 8), zlib_zero_bomb(640000, &inflated));
+        size_t      inflated = 0;
+        const bytes png      = png_wrap(spec(1, 1, 2, 8), zlib_zero_bomb(640000, &inflated));
         g_live = g_peak = 0;
-        int w = 0, h = 0, comp = 0;
-        stbi_uc * px = stbi_load_from_memory(png.data(), (int) png.size(), &w, &h, &comp, 3);
-        const size_t peak = g_peak;
-        const bool rejected = px == nullptr && std::strstr(reason(), "output buffer limit") != nullptr;
+        int          w = 0, h = 0, comp = 0;
+        stbi_uc *    px       = stbi_load_from_memory(png.data(), (int) png.size(), &w, &h, &comp, 3);
+        const size_t peak     = g_peak;
+        const bool   rejected = px == nullptr && std::strstr(reason(), "output buffer limit") != nullptr;
         stbi_image_free(px);
         const size_t limit = 4u << 20;
         if (!rejected || peak >= limit) {
-            std::printf("FAIL bomb 1x1 rgb, %zu-byte png inflating to %zu bytes: %s, reason \"%s\", peak %zu bytes (limit %zu)\n",
-                        png.size(), inflated, px ? "decoded" : "rejected", px ? "(none)" : reason(), peak, limit);
+            std::printf(
+                "FAIL bomb 1x1 rgb, %zu-byte png inflating to %zu bytes: %s, reason \"%s\", peak %zu bytes (limit "
+                "%zu)\n",
+                png.size(), inflated, px ? "decoded" : "rejected", px ? "(none)" : reason(), peak, limit);
             g_failures++;
         } else {
             std::printf("ok   bomb 1x1 rgb, %zu-byte png inflating to %zu bytes: rejected, \"%s\", peak %zu bytes\n",
@@ -517,7 +519,10 @@ int main(int argc, char ** argv) {
 
     // b. non-interlaced round trips
     {
-        const int sizes[][2] = { { 1, 1 }, { 7, 5 } };
+        const int sizes[][2] = {
+            { 1, 1 },
+            { 7, 5 }
+        };
         for (const auto & sz : sizes) {
             expect_roundtrip("gray8", spec(sz[0], sz[1], 0, 8));
             expect_roundtrip("gray1", spec(sz[0], sz[1], 0, 1));
@@ -533,7 +538,15 @@ int main(int argc, char ** argv) {
 
     // c. Adam7 round trips; these sizes leave some passes empty
     {
-        const int sizes[][2] = { { 1, 1 }, { 1, 9 }, { 9, 1 }, { 5, 3 }, { 9, 9 }, { 16, 16 }, { 17, 3 } };
+        const int sizes[][2] = {
+            { 1,  1  },
+            { 1,  9  },
+            { 9,  1  },
+            { 5,  3  },
+            { 9,  9  },
+            { 16, 16 },
+            { 17, 3  }
+        };
         for (const auto & sz : sizes) {
             expect_roundtrip("rgb8", spec(sz[0], sz[1], 2, 8, true));
         }
@@ -543,16 +556,30 @@ int main(int argc, char ** argv) {
         expect_roundtrip("rgb16", spec(5, 3, 2, 16, true));
     }
 
-    // d. one byte past the declared size is rejected, one byte short still fails as before
+    // d. one byte past the declared size is rejected, one byte short still fails as before.
+    // Round trips only catch a declared size that is too small; the Adam7 sub-byte cases with
+    // empty passes catch one that is too large.
     {
-        const png_spec s = spec(7, 5, 2, 8);
-        bytes raw = raw_scanlines(s);
-        bytes longer = raw;
-        longer.push_back(0);
-        expect_reject("rgb8 7x5 stream one byte long", png_wrap(s, zlib_stored(longer)), "output buffer limit");
-        bytes shorter = raw;
-        shorter.pop_back();
-        expect_reject("rgb8 7x5 stream one byte short", png_wrap(s, zlib_stored(shorter)), "not enough pixels");
+        struct {
+            const char * what;
+            png_spec     s;
+        } cases[] = {
+            { "rgb8 7x5", spec(7, 5, 2, 8) },
+            { "adam7 gray1 17x3", spec(17, 3, 0, 1, true) },
+            { "adam7 palette4+trns 9x9", palette_spec(9, 9, 4, true) },
+        };
+
+        for (const auto & c : cases) {
+            const bytes raw    = raw_scanlines(c.s);
+            bytes       longer = raw;
+            longer.push_back(0);
+            const std::string what_long = std::string(c.what) + " stream one byte long";
+            expect_reject(what_long.c_str(), png_wrap(c.s, zlib_stored(longer)), "output buffer limit");
+            bytes shorter = raw;
+            shorter.pop_back();
+            const std::string what_short = std::string(c.what) + " stream one byte short";
+            expect_reject(what_short.c_str(), png_wrap(c.s, zlib_stored(shorter)), "not enough pixels");
+        }
     }
 
     if (g_failures) {

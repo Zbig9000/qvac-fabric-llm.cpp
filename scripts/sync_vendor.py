@@ -106,8 +106,8 @@ patches = {
     "vendor/stb/stb_image.h": [
         (
             '                                  no warranty implied; use at your own risk\n'
-            '\n'
-            ,
+            '\n',
+
             '                                  no warranty implied; use at your own risk\n'
             '\n'
             '   QVAC local modification, re-applied by scripts/sync_vendor.py: QVAC-26299\n'
@@ -117,8 +117,8 @@ patches = {
         ),
         (
             '\n'
-            'STBIDEF int stbi_zlib_decode_buffer(char *obuffer, int olen, char const *ibuffer, int ilen)\n'
-            ,
+            'STBIDEF int stbi_zlib_decode_buffer(char *obuffer, int olen, char const *ibuffer, int ilen)\n',
+
             '\n'
             '#ifndef STBI_NO_PNG\n'
             '// QVAC-26299: fixed-size variant for PNG. The expandable decode above grows\n'
@@ -148,8 +148,8 @@ patches = {
             '   if (!all_ok) return 0;\n'
             '\n'
             '   return 1;\n'
-            '}\n'
-            ,
+            '}\n',
+
             '   if (!all_ok) return 0;\n'
             '\n'
             '   return 1;\n'
@@ -190,8 +190,8 @@ patches = {
         (
             "         case STBI__PNG_TYPE('I','E','N','D'): {\n"
             '            stbi__uint32 raw_len, bpl;\n'
-            '            if (first) return stbi__err("first not IHDR", "Corrupt PNG");\n'
-            ,
+            '            if (first) return stbi__err("first not IHDR", "Corrupt PNG");\n',
+
             "         case STBI__PNG_TYPE('I','E','N','D'): {\n"
             '            stbi__uint32 raw_len;\n'
             '            int exact_len;\n'
@@ -203,8 +203,8 @@ patches = {
             '            bpl = (s->img_x * z->depth + 7) / 8; // bytes per line, per component\n'
             '            raw_len = bpl * s->img_y * s->img_n /* pixels */ + s->img_y /* filter mode per row */;\n'
             '            z->expanded = (stbi_uc *) stbi_zlib_decode_malloc_guesssize_headerflag((char *) z->idata, ioff, raw_len, (int *) &raw_len, !is_iphone);\n'
-            '            if (z->expanded == NULL) return 0; // zlib should set error\n'
-            ,
+            '            if (z->expanded == NULL) return 0; // zlib should set error\n',
+
             '            if (z->idata == NULL) return stbi__err("no IDAT","Corrupt PNG");\n'
             '            // QVAC-26299: decode into a buffer of exactly the declared size\n'
             '            // instead of a growable guess, so memory is bounded by IHDR and a\n'

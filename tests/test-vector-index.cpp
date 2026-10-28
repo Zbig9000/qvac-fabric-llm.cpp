@@ -56,6 +56,7 @@ int64_t ggml_vec_index_test_get_load_count_reject_count(void);
 }
 int snapshot_write_v1_preflight(size_t n, size_t dim);
 uint64_t turbovec_rotation_hash_for_test(int dim);
+int turbovec_rotation_matches_scalar_for_test(int dim, int n);
 size_t turbovec_rotation_cache_bytes_for_test(void);
 uint64_t turbovec_query_rotation_hash_for_test(
     const float * queries,
@@ -4439,6 +4440,14 @@ int main(int argc, char ** argv) {
             }
             check_turbovec_incremental_block_repacking();
             check_turbovec_sparse_filter_block_selection();
+            for (const int dim : { 8, 72, 768 }) {
+                const int rotation_status = turbovec_rotation_matches_scalar_for_test(dim, 3);
+                if (rotation_status < 0) {
+                    std::printf("SKIP TurboVec SIMD rotation parity dim=%d\n", dim);
+                } else {
+                    CHECK(rotation_status == 1);
+                }
+            }
 
             check_turbovec_numeric_helper_parity();
             check_tqplus_deterministic_layout(

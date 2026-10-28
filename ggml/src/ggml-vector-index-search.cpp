@@ -240,6 +240,8 @@ inline double dot_q4_neon(const float * query, const uint8_t * codes, float scal
 
 #if defined(GGML_VEC_INDEX_HAVE_AVX2_KERNEL)
 
+} // namespace
+
 bool cpu_has_avx2() {
 #if defined(_MSC_VER)
     int regs[4] = {};
@@ -265,6 +267,8 @@ bool cpu_has_avx2() {
     return false;
 #endif
 }
+
+namespace {
 
 #endif
 

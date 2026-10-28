@@ -17,5 +17,6 @@ void score_turbovec_lut_block_avx2(
     size_t n_byte_groups,
     size_t n_vectors,
     float * out_scores);
+void apply_turbovec_rotation_avx2(const float * columns, const float * src, float * dst, int dim);
 
 } // namespace ggml_vec_index_detail

@@ -424,6 +424,9 @@ bool turbovec_serialized_dim_supported(int dim);
 ggml_vec_index_t * ggml_vec_index_create_turbovec_for_load(int dim, int bit_width);
 void turbovec_retain_rotation(int dim);
 void turbovec_release_rotation(int dim) noexcept;
+#if defined(GGML_VEC_INDEX_HAVE_AVX2_KERNEL)
+bool cpu_has_avx2();
+#endif
 #ifdef GGML_VEC_INDEX_TEST_HOOKS
 uint64_t turbovec_ziggurat_table_hash_for_test(void);
 double turbovec_ziggurat_x_for_test(int index);
@@ -431,6 +434,7 @@ double turbovec_ziggurat_f_for_test(int index);
 double turbovec_regularized_beta_for_test(double x, double a, double b);
 double turbovec_inverse_regularized_beta_for_test(double probability, double a);
 uint64_t turbovec_rotation_hash_for_test(int dim);
+int turbovec_rotation_matches_scalar_for_test(int dim, int n);
 size_t turbovec_rotation_cache_bytes_for_test(void);
 uint64_t turbovec_query_rotation_hash_for_test(
     const float * queries,

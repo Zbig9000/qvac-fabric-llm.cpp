@@ -37,6 +37,31 @@ inline void dot_q8_avx2_accum(
     acc1 = _mm256_add_pd(acc1, _mm256_mul_pd(_mm256_cvtps_pd(_mm_loadu_ps(query + 4)), q1));
 }
 
+// each lane runs the fma chain of one output row in column order, as the scalar loop does
+template <int kGroups>
+void apply_turbovec_rotation_rows_avx2(
+        const float * columns,
+        const float * src,
+        float * dst,
+        int row,
+        int dim) {
+    __m256 acc[kGroups];
+    for (__m256 & lane : acc) {
+        lane = _mm256_setzero_ps();
+    }
+    for (int column = 0; column < dim; ++column) {
+        const float * values =
+            columns + static_cast<size_t>(column) * static_cast<size_t>(dim) + static_cast<size_t>(row);
+        const __m256 x = _mm256_set1_ps(src[static_cast<size_t>(column)]);
+        for (int i = 0; i < kGroups; ++i) {
+            acc[i] = _mm256_fmadd_ps(_mm256_loadu_ps(values + 8 * i), x, acc[i]);
+        }
+    }
+    for (int i = 0; i < kGroups; ++i) {
+        _mm256_storeu_ps(dst + row + 8 * i, acc[i]);
+    }
+}
+
 } // namespace
 
 double dot_q8_avx2(const float * query, const int8_t * codes, float scale, int dim) {
@@ -183,6 +208,16 @@ void score_turbovec_lut_block_avx2(
                 decoded[lane] * vector_scales[base_vector + lane] :
                 -std::numeric_limits<float>::infinity();
         }
+    }
+}
+
+void apply_turbovec_rotation_avx2(const float * columns, const float * src, float * dst, int dim) {
+    int row = 0;
+    for (; row + 64 <= dim; row += 64) {
+        apply_turbovec_rotation_rows_avx2<8>(columns, src, dst, row, dim);
+    }
+    for (; row < dim; row += 8) {
+        apply_turbovec_rotation_rows_avx2<1>(columns, src, dst, row, dim);
     }
 }
 

@@ -14,6 +14,10 @@
 #include <arm_neon.h>
 #endif
 
+#if defined(GGML_VEC_INDEX_HAVE_AVX2_KERNEL)
+#include "ggml-vector-index-avx2.h"
+#endif
+
 namespace {
 
 constexpr int kTurboVecDimMultiple = 8;
@@ -41,10 +45,16 @@ struct TurboVecCodebook {
     std::vector<float> centroids;
 };
 
+// columns is rows transposed, so SIMD lanes can each run one output row
+struct TurboVecRotation {
+    std::vector<float> rows;
+    std::vector<float> columns;
+};
+
 struct TurboVecRotationCacheEntry {
     size_t ref_count = 0;
-    std::weak_ptr<const std::vector<float>> weak;
-    std::shared_ptr<const std::vector<float>> strong;
+    std::weak_ptr<const TurboVecRotation> weak;
+    std::shared_ptr<const TurboVecRotation> strong;
 };
 
 class ScopedNearestRounding {
@@ -343,17 +353,26 @@ static std::unordered_map<int, TurboVecRotationCacheEntry> & turbovec_rotation_c
     return cache;
 }
 
-static std::shared_ptr<const std::vector<float>> turbovec_rotation(int dim) {
+static std::shared_ptr<const TurboVecRotation> turbovec_rotation(int dim) {
     std::lock_guard<std::mutex> lock(turbovec_rotation_cache_mutex());
     auto & cache = turbovec_rotation_cache();
     auto it = cache.find(dim);
     if (it == cache.end()) {
         it = cache.emplace(dim, TurboVecRotationCacheEntry{}).first;
     }
-    std::shared_ptr<const std::vector<float>> rotation =
+    std::shared_ptr<const TurboVecRotation> rotation =
         it->second.strong != nullptr ? it->second.strong : it->second.weak.lock();
     if (rotation == nullptr) {
-        rotation = std::make_shared<const std::vector<float>>(make_turbovec_rotation(dim));
+        std::vector<float> rows = make_turbovec_rotation(dim);
+        std::vector<float> columns(rows.size());
+        const size_t dim_sz = static_cast<size_t>(dim);
+        for (size_t row = 0; row < dim_sz; ++row) {
+            for (size_t column = 0; column < dim_sz; ++column) {
+                columns[column * dim_sz + row] = rows[row * dim_sz + column];
+            }
+        }
+        rotation = std::make_shared<const TurboVecRotation>(
+            TurboVecRotation{ std::move(rows), std::move(columns) });
         it->second.weak = rotation;
         if (it->second.ref_count != 0) {
             it->second.strong = rotation;
@@ -381,21 +400,68 @@ static void apply_turbovec_rotation_with_matrix(
     }
 }
 
+#if GGML_VEC_INDEX_USE_NEON
+// each lane runs the fma chain of one output row in column order, as the scalar loop does
+template <int kGroups>
+static void apply_turbovec_rotation_rows_neon(
+        const float * columns,
+        const float * src,
+        float * dst,
+        int row,
+        int dim) {
+    float32x4_t acc[kGroups];
+    for (float32x4_t & lane : acc) {
+        lane = vdupq_n_f32(0.0f);
+    }
+    for (int column = 0; column < dim; ++column) {
+        const float * values =
+            columns + static_cast<size_t>(column) * static_cast<size_t>(dim) + static_cast<size_t>(row);
+        const float32x4_t x = vdupq_n_f32(src[static_cast<size_t>(column)]);
+        for (int i = 0; i < kGroups; ++i) {
+            acc[i] = vfmaq_f32(acc[i], vld1q_f32(values + 4 * i), x);
+        }
+    }
+    for (int i = 0; i < kGroups; ++i) {
+        vst1q_f32(dst + row + 4 * i, acc[i]);
+    }
+}
+
+static void apply_turbovec_rotation_neon(const float * columns, const float * src, float * dst, int dim) {
+    int row = 0;
+    for (; row + 64 <= dim; row += 64) {
+        apply_turbovec_rotation_rows_neon<16>(columns, src, dst, row, dim);
+    }
+    for (; row < dim; row += 8) {
+        apply_turbovec_rotation_rows_neon<2>(columns, src, dst, row, dim);
+    }
+}
+#endif
+
 static void apply_turbovec_rotation(const float * src, float * dst, int dim, bool transpose) {
-    const std::shared_ptr<const std::vector<float>> rotation = turbovec_rotation(dim);
-    apply_turbovec_rotation_with_matrix(rotation->data(), src, dst, dim, transpose);
+    const std::shared_ptr<const TurboVecRotation> rotation = turbovec_rotation(dim);
+    apply_turbovec_rotation_with_matrix(rotation->rows.data(), src, dst, dim, transpose);
 }
 
 static void apply_turbovec_rotation_batch(const float * src, float * dst, int n, int dim) {
-    const std::shared_ptr<const std::vector<float>> rotation = turbovec_rotation(dim);
+    const std::shared_ptr<const TurboVecRotation> rotation = turbovec_rotation(dim);
+#if defined(GGML_VEC_INDEX_HAVE_AVX2_KERNEL)
+    static const bool has_avx2 = cpu_has_avx2();
+#endif
     // TQ+ calibration is persisted; keep this reduction order backend-independent.
     for (int row = 0; row < n; ++row) {
-        apply_turbovec_rotation_with_matrix(
-            rotation->data(),
-            src + static_cast<size_t>(row) * static_cast<size_t>(dim),
-            dst + static_cast<size_t>(row) * static_cast<size_t>(dim),
-            dim,
-            false);
+        const float * one = src + static_cast<size_t>(row) * static_cast<size_t>(dim);
+        float * out = dst + static_cast<size_t>(row) * static_cast<size_t>(dim);
+#if GGML_VEC_INDEX_USE_NEON
+        apply_turbovec_rotation_neon(rotation->columns.data(), one, out, dim);
+#else
+#if defined(GGML_VEC_INDEX_HAVE_AVX2_KERNEL)
+        if (has_avx2) {
+            ggml_vec_index_detail::apply_turbovec_rotation_avx2(rotation->columns.data(), one, out, dim);
+            continue;
+        }
+#endif
+        apply_turbovec_rotation_with_matrix(rotation->rows.data(), one, out, dim, false);
+#endif
     }
 }
 
@@ -414,7 +480,7 @@ static void apply_turbovec_query_rotation_batch(
             tvOS 16.4,
             watchOS 9.4,
             *)) {
-        const std::shared_ptr<const std::vector<float>> rotation = turbovec_rotation(dim);
+        const std::shared_ptr<const TurboVecRotation> rotation = turbovec_rotation(dim);
         constexpr int batch_size = 16;
         std::vector<float> padded;
         for (int row = 0; row < n; row += batch_size) {
@@ -444,7 +510,7 @@ static void apply_turbovec_query_rotation_batch(
                 1.0f,
                 batch_src,
                 dim,
-                rotation->data(),
+                rotation->rows.data(),
                 dim,
                 0.0f,
                 batch_dst,
@@ -1051,7 +1117,7 @@ size_t turbovec_rotation_cache_bytes_for_test(void) {
         size_t bytes = 0;
         for (const auto & entry : turbovec_rotation_cache()) {
             if (entry.second.strong != nullptr) {
-                bytes += entry.second.strong->size() * sizeof(float);
+                bytes += (entry.second.strong->rows.size() + entry.second.strong->columns.size()) * sizeof(float);
             }
         }
         return bytes;
@@ -1065,8 +1131,8 @@ uint64_t turbovec_rotation_hash_for_test(int dim) {
         return 0;
     }
     uint64_t hash = UINT64_C(0xcbf29ce484222325);
-    const std::shared_ptr<const std::vector<float>> rotation = turbovec_rotation(dim);
-    for (float value : *rotation) {
+    const std::shared_ptr<const TurboVecRotation> rotation = turbovec_rotation(dim);
+    for (float value : rotation->rows) {
         uint32_t bits = 0;
         std::memcpy(&bits, &value, sizeof(bits));
         for (int byte = 0; byte < 4; ++byte) {
@@ -1075,6 +1141,38 @@ uint64_t turbovec_rotation_hash_for_test(int dim) {
         }
     }
     return hash;
+}
+
+int turbovec_rotation_matches_scalar_for_test(int dim, int n) {
+    if (!turbovec_q4_supported_dim(dim) || n <= 0) {
+        return 0;
+    }
+#if !GGML_VEC_INDEX_USE_NEON && !defined(GGML_VEC_INDEX_HAVE_AVX2_KERNEL)
+    return -1;
+#else
+#if !GGML_VEC_INDEX_USE_NEON
+    if (!cpu_has_avx2()) {
+        return -1;
+    }
+#endif
+    const size_t count = static_cast<size_t>(n) * static_cast<size_t>(dim);
+    std::vector<float> src(count);
+    uint32_t state = 0x9e3779b9u;
+    for (float & value : src) {
+        state = state * 1664525u + 1013904223u;
+        value = static_cast<float>(static_cast<int32_t>(state)) / 2147483648.0f;
+    }
+    std::vector<float> fast(count);
+    std::vector<float> scalar(count);
+    apply_turbovec_rotation_batch(src.data(), fast.data(), n, dim);
+    const std::shared_ptr<const TurboVecRotation> rotation = turbovec_rotation(dim);
+    for (int row = 0; row < n; ++row) {
+        const size_t offset = static_cast<size_t>(row) * static_cast<size_t>(dim);
+        apply_turbovec_rotation_with_matrix(
+            rotation->rows.data(), src.data() + offset, scalar.data() + offset, dim, false);
+    }
+    return std::memcmp(fast.data(), scalar.data(), count * sizeof(float)) == 0 ? 1 : 0;
+#endif
 }
 
 uint64_t turbovec_query_rotation_hash_for_test(

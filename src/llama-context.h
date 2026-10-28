@@ -18,6 +18,7 @@
 #include <vector>
 
 struct llama_model;
+struct llama_coreml_embedding;
 class llama_batch_allocr;
 class llama_moe_cache;
 
@@ -124,6 +125,7 @@ struct llama_context {
     void set_abort_callback(bool (*abort_callback)(void * data), void * abort_callback_data);
 
     void set_embeddings (bool value);
+    bool set_coreml_model(const char * directory, int32_t max_inflight);
     void set_embeddings_nextn(bool value, bool masked);
     void set_embeddings_layer_inp(uint32_t lid, bool enable);
     void set_embeddings_layer_inp_pos_min(llama_seq_id seq_id, llama_pos pos_min);
@@ -328,6 +330,11 @@ private:
     llama_cross cross; // TODO: tmp for handling cross-attention - need something better probably
 
     llama_memory_ptr memory;
+    std::unique_ptr<llama_coreml_embedding, void (*)(llama_coreml_embedding *)> coreml{nullptr, nullptr};
+    bool coreml_contract_matches() const;
+    bool coreml_ubatch_eligible() const;
+    bool run_coreml_probe(llama_coreml_embedding * candidate);
+    bool encode_coreml(const llama_ubatch & ubatch);
     std::unique_ptr<llama_moe_cache> moe_cache;
 
     // decode output (2-dimensional array: [n_outputs][n_vocab])

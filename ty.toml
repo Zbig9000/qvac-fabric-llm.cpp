@@ -30,3 +30,12 @@ include = [
 [overrides.rules]
 unsupported-operator = "ignore"
 not-subscriptable = "ignore"
+
+# The exporter uses its separate, pinned Core ML environment.
+[[overrides]]
+include = [
+    "./examples/embedding-coreml/export_coreml.py",
+]
+
+[overrides.rules]
+unresolved-import = "ignore"

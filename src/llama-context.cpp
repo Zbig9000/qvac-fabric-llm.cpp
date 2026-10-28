@@ -1,5 +1,9 @@
 #include "llama-context.h"
 
+#ifdef LLAMA_USE_COREML
+#include "llama-coreml-impl.h"
+#endif
+
 #include "ggml.h"
 #include "llama-arch.h"
 #include "llama-graph.h"
@@ -1686,6 +1690,159 @@ llm_graph_result * llama_context::process_ubatch(const llama_ubatch & ubatch, ll
     return res;
 }
 
+bool llama_context::set_coreml_model(const char * directory, int32_t max_inflight) {
+#ifdef LLAMA_USE_COREML
+    if (!directory || !directory[0]) {
+        synchronize();
+        coreml.reset();
+        return true;
+    }
+    if (!coreml_contract_matches()) {
+        return false;
+    }
+    if (!llama_coreml_valid_inflight(max_inflight)) {
+        LLAMA_LOG_WARN("%s: max_inflight must be between 1 and %d\n", __func__, LLAMA_COREML_MAX_INFLIGHT);
+        return false;
+    }
+    char error[1024] = {};
+    decltype(coreml) next(llama_coreml_embedding_load_raw(directory, error, sizeof(error)), llama_coreml_embedding_free);
+    if (!next || llama_coreml_embedding_set_max_inflight(next.get(), max_inflight) != 0) {
+        LLAMA_LOG_WARN("%s: could not configure Core ML sidecar: %s\n", __func__, error);
+        return false;
+    }
+    synchronize();
+    if (!run_coreml_probe(next.get())) {
+        return false;
+    }
+    coreml = std::move(next);
+    LLAMA_LOG_INFO("%s: Core ML enabled for compatible mean-pooled token batches\n", __func__);
+    return true;
+#else
+    (void) max_inflight;
+    return !directory || !directory[0];
+#endif
+}
+
+#ifdef LLAMA_USE_COREML
+bool llama_context::coreml_contract_matches() const {
+    if (model.arch != LLM_ARCH_GEMMA_EMBEDDING2 || memory) {
+        LLAMA_LOG_WARN("%s: Core ML sidecars support EmbeddingGemma 2 text encoder contexts only\n", __func__);
+        return false;
+    }
+    if (model.hparams.n_layer() != LLAMA_COREML_N_LAYER || model.hparams.n_embd != LLAMA_COREML_HIDDEN || model.hparams.n_embd_out() != LLAMA_COREML_EMBD_OUT ||
+            model.vocab.n_tokens() != LLAMA_COREML_VOCAB || llama_vocab_bos(&model.vocab) != LLAMA_COREML_BOS || llama_vocab_eos(&model.vocab) != LLAMA_COREML_EOS) {
+        LLAMA_LOG_WARN("%s: model dimensions or vocabulary do not match the EmbeddingGemma 2 sidecar contract\n", __func__);
+        return false;
+    }
+    if (!llama_coreml_context_compatible(cparams, model.hparams)) {
+        LLAMA_LOG_WARN("%s: context RoPE, attention, pooling, or embedding settings do not match the Core ML sidecar\n", __func__);
+        return false;
+    }
+    return true;
+}
+
+bool llama_context::run_coreml_probe(llama_coreml_embedding * candidate) {
+    char error[1024] = {};
+    try {
+        const char * text = llama_coreml_probe_text;
+        llama_token tokens[llama_coreml_probe_tokens];
+        const int32_t count = llama_tokenize(&model.vocab, text, strlen(text), tokens + 1, llama_coreml_probe_tokens - 2, false, false);
+        if (count < 0) {
+            throw std::runtime_error("could not tokenize the sidecar compatibility probe");
+        }
+        tokens[0] = llama_vocab_bos(&model.vocab);
+        tokens[count + 1] = llama_vocab_eos(&model.vocab);
+        const llama_coreml_embedding_sequence sequence = {tokens, count + 2};
+        const size_t dimension = model.hparams.n_embd_out();
+        std::vector<float> actual(dimension);
+        if (llama_coreml_embedding_encode(candidate, &sequence, 1, false, actual.data(), actual.size(), error, sizeof(error)) != 0) {
+            throw std::runtime_error(error);
+        }
+        auto params = llama_context_default_params();
+        params.n_ctx = params.n_batch = params.n_ubatch = llama_coreml_probe_tokens;
+        params.n_seq_max = 1;
+        params.n_threads = cparams.n_threads;
+        params.n_threads_batch = cparams.n_threads_batch;
+        params.embeddings = true;
+        params.pooling_type = LLAMA_POOLING_TYPE_MEAN;
+        params.no_perf = true;
+        // Use a separate context so setup cannot replace the caller's outputs or adapters.
+        auto probe = std::make_unique<llama_context>(model, params);
+        if (probe->encode(llama_batch_get_one(tokens, sequence.n_tokens)) != 0) {
+            throw std::runtime_error("ggml sidecar compatibility probe failed");
+        }
+        const float * expected = llama_get_embeddings_seq(probe.get(), 0);
+        if (!expected) {
+            throw std::runtime_error("ggml sidecar compatibility probe returned no embedding");
+        }
+        const double cosine = llama_coreml_cosine(actual.data(), expected, dimension);
+        if (!std::isfinite(cosine) || cosine < llama_coreml_min_cosine) {
+            LLAMA_LOG_WARN("%s: sidecar compatibility probe cosine %.8f is below %.3f; check that the GGUF and sidecar use matching weights\n", __func__, cosine, llama_coreml_min_cosine);
+            return false;
+        }
+        LLAMA_LOG_INFO("%s: sidecar compatibility probe cosine %.8f\n", __func__, cosine);
+    } catch (const std::exception & failure) {
+        LLAMA_LOG_WARN("%s: could not validate Core ML sidecar: %s\n", __func__, failure.what());
+        return false;
+    }
+    return true;
+}
+
+bool llama_context::coreml_ubatch_eligible() const {
+    if (!coreml || !llama_coreml_context_compatible(cparams, model.hparams) ||
+            cparams.cb_eval || abort_callback || !loras->empty() || !sampling.samplers.empty()) {
+        return false;
+    }
+    for (uint32_t i = 0; i < model.hparams.n_layer(); ++i) {
+        if (cvec->tensor_for(i) || cparams.embeddings_layer_inp[i]) {
+            return false;
+        }
+    }
+    return !cparams.embeddings_layer_inp.back();
+}
+
+bool llama_context::encode_coreml(const llama_ubatch & ubatch) {
+    if (!coreml_ubatch_eligible()) {
+        return false;
+    }
+    try {
+        llama_coreml_tokens tokens;
+        if (!llama_coreml_group_tokens(ubatch, tokens)) {
+            return false;
+        }
+        std::vector<llama_coreml_embedding_sequence> sequences;
+        for (const auto & entry : tokens) {
+            sequences.push_back({entry.second.data(), (int32_t) entry.second.size()});
+        }
+        const size_t dimension = model.hparams.n_embd_out();
+        std::vector<float> output(sequences.size() * dimension);
+        char error[1024] = {};
+        if (llama_coreml_embedding_encode(coreml.get(), sequences.data(), (int32_t) sequences.size(), true,
+                output.data(), output.size(), error, sizeof(error)) != 0) {
+            LLAMA_LOG_WARN("%s: Core ML failed: %s; disabling sidecar and using ggml\n", __func__, error);
+            coreml.reset();
+            return false;
+        }
+        std::map<llama_seq_id, std::vector<float>> result;
+        size_t row = 0;
+        for (const auto & entry : tokens) {
+            result[entry.first].assign(output.begin() + row * dimension, output.begin() + (row + 1) * dimension);
+            ++row;
+        }
+        embd_seq.swap(result);
+        LLAMA_LOG_DEBUG("%s: Core ML encoded %u tokens in %zu sequences\n", __func__, ubatch.n_tokens, sequences.size());
+        return true;
+    } catch (const std::exception & error) {
+        LLAMA_LOG_WARN("%s: Core ML failed: %s; using ggml\n", __func__, error.what());
+        return false;
+    }
+}
+#else
+bool llama_context::encode_coreml(const llama_ubatch &) {
+    return false;
+}
+#endif
+
 int llama_context::encode(const llama_batch_ext & batch_inp) {
     if (batch_inp.tokens.empty()) {
         LLAMA_LOG_ERROR("%s: n_tokens == 0\n", __func__);
@@ -1744,6 +1901,10 @@ int llama_context::encode(const llama_batch_ext & batch_inp) {
     }
 
     n_outputs = n_tokens;
+
+    if (encode_coreml(ubatch)) {
+        return 0;
+    }
 
     const auto causal_attn_org = cparams.causal_attn;
 
@@ -4867,6 +5028,18 @@ int32_t llama_encode(
     }
 
     return ret;
+}
+
+bool llama_supports_coreml(void) {
+#ifdef LLAMA_USE_COREML
+    return true;
+#else
+    return false;
+#endif
+}
+
+bool llama_set_coreml_model(llama_context * ctx, const char * directory, int32_t max_inflight) {
+    return ctx && ctx->set_coreml_model(directory, max_inflight);
 }
 
 int32_t llama_decode(

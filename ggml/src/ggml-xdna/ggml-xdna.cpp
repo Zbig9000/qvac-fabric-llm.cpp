@@ -3728,6 +3728,49 @@ static enum ggml_status xdna_graph_compute_impl(ggml_backend_xdna_context * ctx,
         }
     }
 
+    // Projections of one activation that follow each other (a layer's Q, K
+    // and V) as one prefill GEMM (xdna_pgemm_group_supported), each output
+    // written to its own node when the call runs at the first of them. Only
+    // views sit between them, so nothing runs between the call and a node
+    // whose memory the allocator handed out at its own place in the graph.
+    struct mm_group {
+        std::vector<struct ggml_tensor *> mm;
+    };
+    std::vector<mm_group>                                  mm_groups;
+    std::unordered_map<const struct ggml_tensor *, size_t> group_of;
+    if (g_glue_n_tokens > 1) {
+        auto group_mm = [&](const struct ggml_tensor * t) {
+            return t->op == GGML_OP_MUL_MAT && !consumed.count(t) && !qkv_of.count(t) &&
+                   !(t->flags & GGML_TENSOR_FLAG_OUTPUT);
+        };
+        for (int i = 0; i < cgraph->n_nodes; i++) {
+            if (!group_mm(cgraph->nodes[i])) {
+                continue;
+            }
+            mm_group g;
+            g.mm.push_back(cgraph->nodes[i]);
+            int j = i + 1;
+            for (; j < cgraph->n_nodes; j++) {
+                struct ggml_tensor * b = cgraph->nodes[j];
+                if (ggml_xdna_is_view_op(b->op)) {
+                    continue;
+                }
+                g.mm.push_back(b);
+                if (!group_mm(b) || !xdna_pgemm_group_supported(g.mm.data(), (int) g.mm.size())) {
+                    g.mm.pop_back();
+                    break;
+                }
+            }
+            if (g.mm.size() >= 2) {
+                for (struct ggml_tensor * t : g.mm) {
+                    group_of[t] = mm_groups.size();
+                }
+                mm_groups.push_back(g);
+                i = j - 1;
+            }
+        }
+    }
+
     // Two small projections of one activation (a recurrent layer's alpha and
     // beta) as one prefill GEMM (xdna_pgemm_pair_supported). It runs before
     // the first projection on the array that reads the same activation (the
@@ -3746,7 +3789,7 @@ static enum ggml_status xdna_graph_compute_impl(ggml_backend_xdna_context * ctx,
     if (g_glue_n_tokens > 1) {
         auto free_mm = [&](const struct ggml_tensor * t) {
             return t->op == GGML_OP_MUL_MAT && !consumed.count(t) && !qkv_of.count(t) && !pair_of.count(t) &&
-                   !(t->flags & GGML_TENSOR_FLAG_OUTPUT);
+                   !group_of.count(t) && !(t->flags & GGML_TENSOR_FLAG_OUTPUT);
         };
         for (int i = 0; i < cgraph->n_nodes; i++) {
             struct ggml_tensor * a = cgraph->nodes[i];
@@ -4166,6 +4209,32 @@ static enum ggml_status xdna_graph_compute_impl(ggml_backend_xdna_context * ctx,
             }
             if (!p.qkv_ok && !xdna_ops_compute(&ctx->ops, node)) {
                 return GGML_STATUS_FAILED;
+            }
+            continue;
+        }
+        auto gr = group_of.find(node);
+        if (gr != group_of.end()) {
+            std::vector<struct ggml_tensor *> & mm = mm_groups[gr->second].mm;
+            if (node != mm[0]) {
+                continue;
+            }
+            if (!glue_batch.empty() && !xdna_glue_flush(&ctx->ops, glue_batch)) {
+                return GGML_STATUS_FAILED;
+            }
+            if (!xdna_ops_finalize(&ctx->ops)) {
+                return GGML_STATUS_FAILED;
+            }
+            xdna_pending_wait(ctx);
+            bool ok;
+            {
+                xdna_prof::section_timer st("prefill: pgemm group");
+                ok = xdna_pgemm_run_group(ctx->ops.pool, mm.data(), (int) mm.size());
+            }
+            // one at a time where the node's place is
+            for (size_t k = 0; !ok && k < mm.size(); k++) {
+                if (!xdna_ops_compute(&ctx->ops, mm[k])) {
+                    return GGML_STATUS_FAILED;
+                }
             }
             continue;
         }

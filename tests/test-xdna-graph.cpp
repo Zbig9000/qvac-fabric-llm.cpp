@@ -20,6 +20,10 @@
 // in whole blocks, into rows the allocation reserves for it, and the tensor
 // that follows it is untouched.
 //
+// Projections of one activation that follow each other (Q, K and V), in the
+// backend's own buffers: one call writes each output into its own tensor, in
+// whole blocks of 128 rows, and the tensor that follows them is untouched.
+//
 // A prompt's FFN, down(GLU(gate(x), up(x))) with SWIGLU and with GEGLU: the
 // backend runs the gate and up projections and the activation as one call,
 // writing the product straight into the down projection's input; with the
@@ -34,6 +38,7 @@
 #include "ggml-alloc.h"
 #include "ggml-backend.h"
 
+#include <algorithm>
 #include <cmath>
 #include <cstdio>
 #include <cstdlib>
@@ -281,6 +286,59 @@ static bool test_ffn(ggml_backend_t npu, ggml_backend_t cpu, ggml_glu_op op, boo
     return passed;
 }
 
+// x (K x M) through Q8_0 projections of `ns[i]` rows each, then a tensor to guard
+static norm_graph build_group(ggml_backend_t be, const std::vector<int64_t> & ns, int64_t M, ggml_tensor ** guard) {
+    const int64_t K = 512;
+    norm_graph    g;
+    ggml_init_params ip = { ggml_tensor_overhead() * 16 + ggml_graph_overhead(), nullptr, true };
+    g.ctx               = ggml_init(ip);
+    ggml_tensor * x     = ggml_new_tensor_2d(g.ctx, GGML_TYPE_F32, K, M);
+    g.inputs            = { x };
+    std::vector<ggml_tensor *> mm;
+    for (int64_t n : ns) {
+        ggml_tensor * w = ggml_new_tensor_2d(g.ctx, GGML_TYPE_Q8_0, K, n);
+        g.inputs.push_back(w);
+        mm.push_back(ggml_mul_mat(g.ctx, w, x));
+    }
+    *guard = ggml_new_tensor_1d(g.ctx, GGML_TYPE_F32, 2 * 1024);
+    g.gf   = ggml_new_graph(g.ctx);
+    for (ggml_tensor * t : mm) {
+        ggml_build_forward_expand(g.gf, t);
+    }
+    g.checked = mm;
+    g.buf     = ggml_backend_alloc_ctx_tensors(g.ctx, be);
+    return g;
+}
+
+static bool test_group(ggml_backend_t npu, ggml_backend_t cpu, const std::vector<int64_t> & ns, int64_t M, double tol) {
+    ggml_tensor *                   cpu_guard = nullptr;
+    ggml_tensor *                   npu_guard = nullptr;
+    norm_graph                      want_g    = build_group(cpu, ns, M, &cpu_guard);
+    norm_graph                      got_g     = build_group(npu, ns, M, &npu_guard);
+    std::vector<std::vector<float>> want, got;
+    std::vector<float>              pattern(ggml_nelements(npu_guard), 3.0f);
+    bool                            ok = run(want_g, cpu, want);
+    ggml_backend_buffer_clear(got_g.buf, 0);
+    set_inputs(got_g, 1234);
+    ggml_backend_tensor_set(npu_guard, pattern.data(), 0, ggml_nbytes(npu_guard));
+    ok = ok && ggml_backend_graph_compute(npu, got_g.gf) == GGML_STATUS_SUCCESS;
+    std::vector<float> after(pattern.size());
+    ggml_backend_tensor_get(npu_guard, after.data(), 0, ggml_nbytes(npu_guard));
+    double worst = 0;
+    for (size_t i = 0; ok && i < got_g.checked.size(); i++) {
+        worst = std::max(worst, nmse(want[i], get_f32(got_g.checked[i])));
+    }
+    const bool intact = after == pattern;
+    const bool passed = ok && intact && worst < tol;
+    std::printf("MUL_MAT group of %zu, M %-4lld guard %s, worst nmse %.3g %s\n", ns.size(), (long long) M,
+                intact ? "intact" : "OVERWRITTEN", ok ? worst : INFINITY, passed ? "ok" : "FAIL");
+    ggml_backend_buffer_free(want_g.buf);
+    ggml_backend_buffer_free(got_g.buf);
+    ggml_free(want_g.ctx);
+    ggml_free(got_g.ctx);
+    return passed;
+}
+
 int main(void) {
     ggml_backend_load_all();
     ggml_backend_dev_t dev = xdna_device();
@@ -340,6 +398,13 @@ int main(void) {
 
     for (int64_t M : { 100, 129, 300 }) {
         passed = test_output_in_place(npu, cpu, M, tol) && passed;
+    }
+
+    const std::vector<std::vector<int64_t>> groups = { { 1024, 512, 512 }, { 2048, 512, 512 }, { 1024, 640 } };
+    for (const std::vector<int64_t> & ns : groups) {
+        for (int64_t M : { 100, 200, 300 }) {
+            passed = test_group(npu, cpu, ns, M, tol) && passed;
+        }
     }
 
     for (ggml_glu_op op : { GGML_GLU_OP_SWIGLU, GGML_GLU_OP_GEGLU }) {

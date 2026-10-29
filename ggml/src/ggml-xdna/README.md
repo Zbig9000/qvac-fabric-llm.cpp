@@ -107,6 +107,11 @@ Q8_0 and BF16 files) runs without a model-specific path:
   down projection's input in bf16, so the activation never goes to the host
   (`GGML_XDNA_PGEMM_GLU=0` and `GGML_XDNA_PGEMM_GLU_A=0` turn the two steps
   off).
+- A layer's Q, K and V projections, which follow each other in the graph
+  (`gemma-embedding2.cpp` adds them to it together), run as one prefill GEMM
+  that writes each output into its own node (`GGML_XDNA_PGEMM_GROUP=0`: one
+  GEMM each). All but the last end on a whole 512 columns and every node must
+  lie in one of the backend's buffers.
 - Attention, the norms, RoPE and the mean pooling are host glue. The
   prefill attention kernel is causal with 256-wide heads, and this model's
   attention is bidirectional, with a sliding window on most layers.
@@ -422,6 +427,7 @@ report, not for tuning: every one costs more time or energy than the default.
 | `GGML_XDNA_PGEMM_GATE_A` | the attention gate written into the output projection's A |
 | `GGML_XDNA_PGEMM_GLU` | the SwiGLU or GeGLU computed from the gate and up GEMMs on the array |
 | `GGML_XDNA_PGEMM_GLU_A` | the SwiGLU or GeGLU written into the down projection's A |
+| `GGML_XDNA_PGEMM_GROUP` | consecutive projections of one activation (Q, K and V) run as one GEMM, each output into its own node |
 | `GGML_XDNA_GDN_MM` | the prefill gated delta rule on the array |
 | `GGML_XDNA_GDN_IN` | the prefill GDN's conv input, norms and state copy fed straight into the array |
 | `GGML_XDNA_FA_MM` | the prefill attention on the array |
@@ -478,7 +484,7 @@ Diagnostics - nothing is measured unless they are set:
 | `xdna-att-layer.h/.cpp` | a full-attention decode layer as one dispatch of the fused design |
 | `xdna-att.h/.cpp` | the decode attention on the fused design's GEMV pool |
 | `xdna-head.h/.cpp` | the decode's vocabulary projection on the pool, with its exact and 4-bit rows |
-| `xdna-pgemm.h/.cpp` | the prefill GEMM in the decode GEMV's weight tiles, and what it folds in (norm, SwiGLU or GeGLU, gate into A) |
+| `xdna-pgemm.h/.cpp` | the prefill GEMM in the decode GEMV's weight tiles, and what it folds in (norm, SwiGLU or GeGLU, gate into A) and the projections it runs as one |
 | `xdna-attn-mm.h/.cpp` | the prefill attention on the array |
 | `xdna-gdn-mm.h/.cpp` | the prefill gated delta rule on the array, and the GDN input it is fed |
 | `xdna-conv-prefill.h/.cpp` | SSM_CONV prefill runner (opt-in) |

@@ -99,7 +99,7 @@ The matrix (`weekly.sh`; the machine scripts trim it to their time budget):
 5. **Depth:** one request per prompt length through one server start (`DEPTHS="1024 4096 16384 32768 ..."`, `--concurrency 1 --gen 128`). Prefill t/s is prompt tokens / time to first token; decode t/s is that request's decode rate. Real prompts run 0-28% longer than requested (104857 requested is about 123k real), so size the context for that.
 6. **Depth with DFlash2** (Mac) for the engines that can switch it on.
 
-qvac-fabric runs the PR stack branch `dflash-deferred-commit-temp-11259` with `LLAMA_GDN_DEFERRED=1` (deferred recurrent-state commit for speculative decoding).
+qvac-fabric runs the PR stack branch `temp-11259` with `LLAMA_GDN_DEFERRED=1` (deferred recurrent-state commit for speculative decoding).
 
 ## Procedure
 

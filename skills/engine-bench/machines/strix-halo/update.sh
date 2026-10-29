@@ -71,7 +71,7 @@ update_family() {
 
 update_llama()  { update_family llama  https://github.com/ggml-org/llama.cpp.git master UP llama.cpp; }
 update_strix()  { update_family strix  https://github.com/halo-box/strix-llama.cpp.git master STRIX strix-llama.cpp; }
-update_fabric() { update_family fabric https://github.com/tetherto/qvac-fabric-llm.cpp.git dflash-deferred-commit-temp-11259 FAB qvac-fabric; }
+update_fabric() { update_family fabric https://github.com/tetherto/qvac-fabric-llm.cpp.git temp-11259 FAB qvac-fabric; }
 update_nath()   { update_family nath   https://github.com/Nathanw1014/llama.cpp.git strix-halo-vulkan NATH nathanw-strix-vulkan; }
 update_paoai()  { update_family paoai  https://github.com/guevae2/paoai-strix-engine.git strix-main PAOAI paoai-strix-engine; }
 

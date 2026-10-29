@@ -43,7 +43,7 @@ update_llama() {
 }
 
 update_fabric() {
-  build_llama fabric https://github.com/tetherto/qvac-fabric-llm.cpp.git dflash-deferred-commit-temp-11259 || return 1
+  build_llama fabric https://github.com/tetherto/qvac-fabric-llm.cpp.git temp-11259 || return 1
   [ "${FAB_VER:-}" != "$NEW_VER" ] && note "qvac-fabric: ${FAB_VER:-none} -> $NEW_VER" || note "qvac-fabric: unchanged, $NEW_VER"
   FAB_BIN=$NEW_BIN; FAB_VER=$NEW_VER
 }

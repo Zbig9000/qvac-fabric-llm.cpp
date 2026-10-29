@@ -1,0 +1,92 @@
+[
+  {
+    "name": "control",
+    "passed": true,
+    "command": [
+      "${HOME}/qwen38-accuracy-20261029/build-accuracy/llama-coreml-decoder-bench",
+      "/Users/Shared/models/Qwen3.8-27B-UD-Q4_K_XL.gguf",
+      "${HOME}/qwen38-survey-20261029/combined/best16/selection",
+      "quality-metal",
+      "${HOME}/qwen38-parallel-ffn/code.txt",
+      "512,2048",
+      "16",
+      "1",
+      "${HOME}/qwen38-survey-20261029/combined/best16/control"
+    ],
+    "exit_code": 0,
+    "seconds": 26.236726760864258,
+    "quality": [
+      {
+        "prompt_tokens": "512",
+        "mean_kl": "0.000002678",
+        "max_kl": "0.000039022",
+        "top1_agreement": "0.998046875",
+        "metal_nll": "8.403834953",
+        "split_nll": "8.403988156",
+        "metal_ppl": "4464.153780978",
+        "split_ppl": "4464.837756530",
+        "offload_calls": "28",
+        "screen_pass": "1",
+        "reference_custom": "1"
+      },
+      {
+        "prompt_tokens": "2048",
+        "mean_kl": "0.000004303",
+        "max_kl": "0.000570182",
+        "top1_agreement": "0.997558594",
+        "metal_nll": "12.598820929",
+        "split_nll": "12.599111817",
+        "metal_ppl": "296209.107686293",
+        "split_ppl": "296295.283858232",
+        "offload_calls": "112",
+        "screen_pass": "1",
+        "reference_custom": "1"
+      }
+    ]
+  },
+  {
+    "name": "code",
+    "passed": false,
+    "command": [
+      "${HOME}/qwen38-accuracy-20261029/build-accuracy/llama-coreml-decoder-bench",
+      "/Users/Shared/models/Qwen3.8-27B-UD-Q4_K_XL.gguf",
+      "${HOME}/qwen38-survey-20261029/combined/best16/selection",
+      "quality",
+      "${HOME}/qwen38-parallel-ffn/code.txt",
+      "512,2048",
+      "16",
+      "1",
+      "${HOME}/qwen38-survey-20261029/combined/best16/code"
+    ],
+    "exit_code": 0,
+    "seconds": 42.21640706062317,
+    "quality": [
+      {
+        "prompt_tokens": "512",
+        "mean_kl": "0.000631478",
+        "max_kl": "0.026372486",
+        "top1_agreement": "0.984375000",
+        "metal_nll": "8.403834953",
+        "split_nll": "8.391989718",
+        "metal_ppl": "4464.153780978",
+        "split_ppl": "4411.586780063",
+        "offload_calls": "28",
+        "screen_pass": "1",
+        "reference_custom": "0"
+      },
+      {
+        "prompt_tokens": "2048",
+        "mean_kl": "0.001127598",
+        "max_kl": "0.066853095",
+        "top1_agreement": "0.986328125",
+        "metal_nll": "12.598820929",
+        "split_nll": "12.577223497",
+        "metal_ppl": "296209.107686293",
+        "split_ppl": "289880.340257511",
+        "offload_calls": "112",
+        "screen_pass": "0",
+        "reference_custom": "0"
+      }
+    ]
+  }
+]

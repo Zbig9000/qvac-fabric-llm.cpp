@@ -1,0 +1,56 @@
+{
+  "command": [
+    "${HOME}/qwen38-overall-20261029/llama-coreml-decoder-bench-cached",
+    "/Users/Shared/models/Qwen3.8-27B-UD-Q4_K_XL.gguf",
+    "${HOME}/qwen38-overall-20261029/combined/expand22/selection",
+    "quality",
+    "${HOME}/qwen38-accuracy-20261029/heldout/build-guide.txt",
+    "512,2048,8192",
+    "16",
+    "1",
+    "${HOME}/qwen38-overall-20261029/combined/expand22/build-guide"
+  ],
+  "exit_code": 0,
+  "seconds": 95.66309094429016,
+  "quality": [
+    {
+      "prompt_tokens": "512",
+      "mean_kl": "0.000059111",
+      "max_kl": "0.001769131",
+      "top1_agreement": "0.996093750",
+      "metal_nll": "1.108172027",
+      "split_nll": "1.108627347",
+      "metal_ppl": "3.028816735",
+      "split_ppl": "3.030196130",
+      "offload_calls": "22",
+      "screen_pass": "1",
+      "reference_custom": "0"
+    },
+    {
+      "prompt_tokens": "2048",
+      "mean_kl": "0.000078566",
+      "max_kl": "0.008080616",
+      "top1_agreement": "0.997558594",
+      "metal_nll": "1.318917821",
+      "split_nll": "1.318853677",
+      "metal_ppl": "3.739372517",
+      "split_ppl": "3.739132665",
+      "offload_calls": "88",
+      "screen_pass": "1",
+      "reference_custom": "0"
+    },
+    {
+      "prompt_tokens": "8192",
+      "mean_kl": "0.000050613",
+      "max_kl": "0.008080616",
+      "top1_agreement": "0.997436523",
+      "metal_nll": "1.239588630",
+      "split_nll": "1.239651465",
+      "metal_ppl": "3.454192222",
+      "split_ppl": "3.454409272",
+      "offload_calls": "352",
+      "screen_pass": "1",
+      "reference_custom": "0"
+    }
+  ]
+}

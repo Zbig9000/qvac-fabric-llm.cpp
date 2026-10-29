@@ -1,0 +1,962 @@
+[
+  {
+    "assets": "${HOME}/qwen38-accuracy-20261029/assets/layer31-fp16",
+    "files": [
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+        "bytes": 14197,
+        "sha256": "f9f56ed0fa68f58e32ac16c2ecc71e4867945543744801335c5179d23e9534b4"
+      },
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+        "bytes": 188748480,
+        "sha256": "8e0921712ad00099e2f25bf2d36cc000b10c37a548150ceb30f307b1bea61a31"
+      },
+      {
+        "path": "ffn-512.mlpackage/Manifest.json",
+        "bytes": 617,
+        "sha256": "ab4d7f096247edea43f2d3758fc5f6d0968e90e01c857a2813d0f1f3d323383f"
+      },
+      {
+        "path": "ffn-512.mlmodelc/analytics/coremldata.bin",
+        "bytes": 243,
+        "sha256": "062ea05aea3c156864b555a0122f26df90c3ece192b0fe018e3f1bec819a6b30"
+      },
+      {
+        "path": "ffn-512.mlmodelc/coremldata.bin",
+        "bytes": 391,
+        "sha256": "556be89a56838a864bfe09d6e9ad1ad129f34e48be7de621e55e9973d2f8d3e6"
+      },
+      {
+        "path": "ffn-512.mlmodelc/model.mil",
+        "bytes": 14396,
+        "sha256": "cb6980a1ee2a675772fc4acec8652be15802fc104bea62f50f5bb5b95d613f24"
+      },
+      {
+        "path": "ffn-512.mlmodelc/weights/weight.bin",
+        "bytes": 188748480,
+        "sha256": "8e0921712ad00099e2f25bf2d36cc000b10c37a548150ceb30f307b1bea61a31"
+      }
+    ]
+  },
+  {
+    "assets": "${HOME}/qwen38-accuracy-20261029/assets/layer39-b8",
+    "files": [
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+        "bytes": 15432,
+        "sha256": "765ce6e27f48e9c63eebd34dc860a33ef993350cd053127d1485d8e3240e9d2a"
+      },
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "d56968db8d2bb265dc8f26ee46293db2e48c642f538860ed855bad430fb95d0e"
+      },
+      {
+        "path": "ffn-512.mlpackage/Manifest.json",
+        "bytes": 617,
+        "sha256": "5db70d9072c0a45fc2ddd16ca5006e7e4c9fab1bf119a187cf7152656e947381"
+      },
+      {
+        "path": "ffn-512.mlmodelc/analytics/coremldata.bin",
+        "bytes": 243,
+        "sha256": "e8b733419e15b26fc3ae737134c7f01235879ffa95b0d2e9bcc62d847e60417f"
+      },
+      {
+        "path": "ffn-512.mlmodelc/coremldata.bin",
+        "bytes": 391,
+        "sha256": "973bb1f1b375760f947b331e3a792664533f9a2585b53663c94abf73eb5340aa"
+      },
+      {
+        "path": "ffn-512.mlmodelc/model.mil",
+        "bytes": 15946,
+        "sha256": "d8d407c62f3625dac89d9f321889dcfeff21b3cb002e536d67425d28b1fecff2"
+      },
+      {
+        "path": "ffn-512.mlmodelc/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "d56968db8d2bb265dc8f26ee46293db2e48c642f538860ed855bad430fb95d0e"
+      }
+    ]
+  },
+  {
+    "assets": "${HOME}/qwen38-accuracy-20261029/assets/layer43-b8",
+    "files": [
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+        "bytes": 15432,
+        "sha256": "6e8693095e4e44534790332325d2340bbad231b6f8298f7c8c2a8613f16ea3a7"
+      },
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "d6020f4a5b4c05e7afcc90605e52f0836d08e3b6fb2d07d0bec48b3a10d2be71"
+      },
+      {
+        "path": "ffn-512.mlpackage/Manifest.json",
+        "bytes": 617,
+        "sha256": "8442bd566876d78940ef80c9084b68e9ae5c533dd1fb0998f379d7db2518a6fe"
+      },
+      {
+        "path": "ffn-512.mlmodelc/analytics/coremldata.bin",
+        "bytes": 243,
+        "sha256": "42a53604cd330fe660b9e8c0c1c202935696bb60fa40e6ef99d47db248de740b"
+      },
+      {
+        "path": "ffn-512.mlmodelc/coremldata.bin",
+        "bytes": 391,
+        "sha256": "f296de708c0587ff5595673a30b539961505ed24ead9af4c5cdfec7c6f9feb41"
+      },
+      {
+        "path": "ffn-512.mlmodelc/model.mil",
+        "bytes": 15946,
+        "sha256": "d8d407c62f3625dac89d9f321889dcfeff21b3cb002e536d67425d28b1fecff2"
+      },
+      {
+        "path": "ffn-512.mlmodelc/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "d6020f4a5b4c05e7afcc90605e52f0836d08e3b6fb2d07d0bec48b3a10d2be71"
+      }
+    ]
+  },
+  {
+    "assets": "${HOME}/qwen38-accuracy-20261029/assets/layer51-b8",
+    "files": [
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+        "bytes": 15432,
+        "sha256": "6a9ac6bc15c8dd3f798dc3cbc8fe99e2644aeb356b0398b0eaf3a200a4bb8bf8"
+      },
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "ca3f1ca34aab299046288e781f7a1e335511df86042f22d6a2d6de73eb65a48b"
+      },
+      {
+        "path": "ffn-512.mlpackage/Manifest.json",
+        "bytes": 617,
+        "sha256": "7ccd407ac420fd6d19231eb377a73a6af4f1ec6123cccbffa23aac3b2154c5ea"
+      },
+      {
+        "path": "ffn-512.mlmodelc/analytics/coremldata.bin",
+        "bytes": 243,
+        "sha256": "ce4a4ecb2705c3f2026e6772ec1fc59d09c6efd0042a09edc689a4e9b1df8b93"
+      },
+      {
+        "path": "ffn-512.mlmodelc/coremldata.bin",
+        "bytes": 391,
+        "sha256": "004940b04e9880f27342cab9ed1d032645771fbcb63bc3f18c171aef672cd759"
+      },
+      {
+        "path": "ffn-512.mlmodelc/model.mil",
+        "bytes": 15946,
+        "sha256": "d8d407c62f3625dac89d9f321889dcfeff21b3cb002e536d67425d28b1fecff2"
+      },
+      {
+        "path": "ffn-512.mlmodelc/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "ca3f1ca34aab299046288e781f7a1e335511df86042f22d6a2d6de73eb65a48b"
+      }
+    ]
+  },
+  {
+    "assets": "${HOME}/qwen38-accuracy-20261029/assets/layer59-b8",
+    "files": [
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+        "bytes": 15432,
+        "sha256": "bb0d21e9b623227dec647ce3533c48e4b00f11633cc671d59d76ffc8811d0c27"
+      },
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "bdf36ccf826764a4b364b4fa5f8f64d10cff4c1fdcf4226c70da8a6e984375a9"
+      },
+      {
+        "path": "ffn-512.mlpackage/Manifest.json",
+        "bytes": 617,
+        "sha256": "5796defe62fee27c9877f5ae5c044751ca12535b9b4dbeaa30b0845ae0c50a3f"
+      },
+      {
+        "path": "ffn-512.mlmodelc/analytics/coremldata.bin",
+        "bytes": 243,
+        "sha256": "cf1c1e300f98b746cf2cd62902552b59e46f7baec8424104b46c0a1d54d021c9"
+      },
+      {
+        "path": "ffn-512.mlmodelc/coremldata.bin",
+        "bytes": 391,
+        "sha256": "0d1b7285012a2d4761b4abf6832daf0fe599a2f92a3a95371a6c823d22a9fcfa"
+      },
+      {
+        "path": "ffn-512.mlmodelc/model.mil",
+        "bytes": 15946,
+        "sha256": "d8d407c62f3625dac89d9f321889dcfeff21b3cb002e536d67425d28b1fecff2"
+      },
+      {
+        "path": "ffn-512.mlmodelc/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "bdf36ccf826764a4b364b4fa5f8f64d10cff4c1fdcf4226c70da8a6e984375a9"
+      }
+    ]
+  },
+  {
+    "assets": "${HOME}/qwen38-decoder-layer47-b8",
+    "files": [
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+        "bytes": 15432,
+        "sha256": "fbba151e4d12591d78ebac3a7bc14a0a0e6ddb89a970c7cb025f7e008afc9263"
+      },
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "23339b049b4d7b1bdac6ad9ff4e0d1d57ad443b0f603dc3c543b1ba831376f17"
+      },
+      {
+        "path": "ffn-512.mlpackage/Manifest.json",
+        "bytes": 617,
+        "sha256": "3adf15ae43a884987b3d236e04c467b8894df84618f46857e6ac269e30593f9e"
+      },
+      {
+        "path": "ffn-512.mlmodelc/analytics/coremldata.bin",
+        "bytes": 243,
+        "sha256": "f6a771352c65ec30e9808b3981cb8bb3563f0f6ec25373a103e65d41e54293f8"
+      },
+      {
+        "path": "ffn-512.mlmodelc/coremldata.bin",
+        "bytes": 391,
+        "sha256": "ab8469b5ba62656dee660390c77d9b310da903bac88b6569395bc2bcc8ff3f45"
+      },
+      {
+        "path": "ffn-512.mlmodelc/model.mil",
+        "bytes": 15946,
+        "sha256": "d8d407c62f3625dac89d9f321889dcfeff21b3cb002e536d67425d28b1fecff2"
+      },
+      {
+        "path": "ffn-512.mlmodelc/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "23339b049b4d7b1bdac6ad9ff4e0d1d57ad443b0f603dc3c543b1ba831376f17"
+      }
+    ]
+  },
+  {
+    "assets": "${HOME}/qwen38-decoder-layer55-b8",
+    "files": [
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+        "bytes": 15432,
+        "sha256": "785aaf7334ff9bcb7bfecc4360de32ee3e03a6e6646fc3078c624c1033c7b5aa"
+      },
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "d2652714aad94c5dbcb83009edfa6769973defac3963e498195f729662579ae3"
+      },
+      {
+        "path": "ffn-512.mlpackage/Manifest.json",
+        "bytes": 617,
+        "sha256": "8b861b0a45daeb11eebd5f9754294816a7a72a6514f48fe09db76e28bb90a8e2"
+      },
+      {
+        "path": "ffn-512.mlmodelc/analytics/coremldata.bin",
+        "bytes": 243,
+        "sha256": "046544c8616aa4f56aeb5e912392408060ac9cf89475922a51918d3dd44d38a9"
+      },
+      {
+        "path": "ffn-512.mlmodelc/coremldata.bin",
+        "bytes": 391,
+        "sha256": "7ab072f447dfb20b8c107c1c37c0d655a1cdbf7e5432305b2198864da121a945"
+      },
+      {
+        "path": "ffn-512.mlmodelc/model.mil",
+        "bytes": 15946,
+        "sha256": "d8d407c62f3625dac89d9f321889dcfeff21b3cb002e536d67425d28b1fecff2"
+      },
+      {
+        "path": "ffn-512.mlmodelc/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "d2652714aad94c5dbcb83009edfa6769973defac3963e498195f729662579ae3"
+      }
+    ]
+  },
+  {
+    "assets": "${HOME}/qwen38-decoder-layer63-b8",
+    "files": [
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+        "bytes": 15432,
+        "sha256": "6c9a1d321111442aa756d2c27d677eaba6e79ac7e0c5a40d891bd8a67a5095d2"
+      },
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "0e76b59382b68b7bb1886e8c23424a5103c113771afb2e3cebb4ea07138ed9df"
+      },
+      {
+        "path": "ffn-512.mlpackage/Manifest.json",
+        "bytes": 617,
+        "sha256": "05a22bfc62c9846d08cd645ccea2e146b76f86fc86845fea4de1cfe0830747de"
+      },
+      {
+        "path": "ffn-512.mlmodelc/analytics/coremldata.bin",
+        "bytes": 243,
+        "sha256": "1cc63103dc16dfa8a1bcabbbb7bfe019b28c7fb8049ebc0544e8504962d063bf"
+      },
+      {
+        "path": "ffn-512.mlmodelc/coremldata.bin",
+        "bytes": 391,
+        "sha256": "bc2fa9a64bbeb7060d069e60e2f3fe386cb03479d4c33adbe1a2e25740d436ae"
+      },
+      {
+        "path": "ffn-512.mlmodelc/model.mil",
+        "bytes": 15946,
+        "sha256": "d8d407c62f3625dac89d9f321889dcfeff21b3cb002e536d67425d28b1fecff2"
+      },
+      {
+        "path": "ffn-512.mlmodelc/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "0e76b59382b68b7bb1886e8c23424a5103c113771afb2e3cebb4ea07138ed9df"
+      }
+    ]
+  },
+  {
+    "assets": "${HOME}/qwen38-extend-20261029/assets/layer35-b8",
+    "files": [
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+        "bytes": 15432,
+        "sha256": "7177b5ffce1fdde1cc6599985317953ce430957cc705be230f7ae6c4e0391e10"
+      },
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "15bb64fdbe73c7efa56ef8a46cb25f637e80151b9f0223b8c58a536fde46edd0"
+      },
+      {
+        "path": "ffn-512.mlpackage/Manifest.json",
+        "bytes": 617,
+        "sha256": "706185713a1f3de2ad1da63eeee3ceef60e3bd60609e2fc42acf80e5b1fda1db"
+      },
+      {
+        "path": "ffn-512.mlmodelc/analytics/coremldata.bin",
+        "bytes": 243,
+        "sha256": "4b38c1197d72736086a17b0ab352f22c0f306424638233d3893daa954f639a98"
+      },
+      {
+        "path": "ffn-512.mlmodelc/coremldata.bin",
+        "bytes": 391,
+        "sha256": "65ac547d7bf59cde5f1ee19e92491eb459f55a17e936ef9bf30c25a8e3ce6ace"
+      },
+      {
+        "path": "ffn-512.mlmodelc/model.mil",
+        "bytes": 15946,
+        "sha256": "d8d407c62f3625dac89d9f321889dcfeff21b3cb002e536d67425d28b1fecff2"
+      },
+      {
+        "path": "ffn-512.mlmodelc/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "15bb64fdbe73c7efa56ef8a46cb25f637e80151b9f0223b8c58a536fde46edd0"
+      }
+    ]
+  },
+  {
+    "assets": "${HOME}/qwen38-extend-20261029/assets/layer46-b8",
+    "files": [
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+        "bytes": 15432,
+        "sha256": "f2fc55d1ec500845ba911583fa5d5ca135efdb406c07e719ef7e275fa4853a66"
+      },
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "2813e57adbcde837e079919b90d3fad01d2a2a49ea3ff65ad7fd1dc5475620e4"
+      },
+      {
+        "path": "ffn-512.mlpackage/Manifest.json",
+        "bytes": 617,
+        "sha256": "fb33d930edec5a4c1f0ef44fd95982f483071ef44833b21af238b13a3435a0ac"
+      },
+      {
+        "path": "ffn-512.mlmodelc/analytics/coremldata.bin",
+        "bytes": 243,
+        "sha256": "b306f96f7114e8d860a1b96241c28374441e8bb37621eb4c19da6dabf5f281b0"
+      },
+      {
+        "path": "ffn-512.mlmodelc/coremldata.bin",
+        "bytes": 391,
+        "sha256": "becc79dba94e4c97ed169c04fa5cf2c907ca1b281413f5a78d95b48eadef8bfd"
+      },
+      {
+        "path": "ffn-512.mlmodelc/model.mil",
+        "bytes": 15946,
+        "sha256": "d8d407c62f3625dac89d9f321889dcfeff21b3cb002e536d67425d28b1fecff2"
+      },
+      {
+        "path": "ffn-512.mlmodelc/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "2813e57adbcde837e079919b90d3fad01d2a2a49ea3ff65ad7fd1dc5475620e4"
+      }
+    ]
+  },
+  {
+    "assets": "${HOME}/qwen38-extend-20261029/assets/layer54-b8",
+    "files": [
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+        "bytes": 15432,
+        "sha256": "82a7be5b70085303aa261c5adb82d637363ab3fee39d1bc46a2d2143408cf3b1"
+      },
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "86314049d7241e42ea78359332e496cd97fc71e5eb4384c839e97fe385d7bc6a"
+      },
+      {
+        "path": "ffn-512.mlpackage/Manifest.json",
+        "bytes": 617,
+        "sha256": "083162ad0ac6e1a9e97aa7500bacfb00fcfc6fe3d44be29e686eda0a765769d1"
+      },
+      {
+        "path": "ffn-512.mlmodelc/analytics/coremldata.bin",
+        "bytes": 243,
+        "sha256": "43bf7a74b3aefb9cd2231e4a6093882fa514b4b269b7ebe9a7792065d373b62d"
+      },
+      {
+        "path": "ffn-512.mlmodelc/coremldata.bin",
+        "bytes": 391,
+        "sha256": "b5b1e5aa446648a4ccd8e8390bc6575fc8e7692441951fe7ab0ea41370a4f6f5"
+      },
+      {
+        "path": "ffn-512.mlmodelc/model.mil",
+        "bytes": 15946,
+        "sha256": "d8d407c62f3625dac89d9f321889dcfeff21b3cb002e536d67425d28b1fecff2"
+      },
+      {
+        "path": "ffn-512.mlmodelc/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "86314049d7241e42ea78359332e496cd97fc71e5eb4384c839e97fe385d7bc6a"
+      }
+    ]
+  },
+  {
+    "assets": "${HOME}/qwen38-extend-20261029/assets/layer62-b8",
+    "files": [
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+        "bytes": 15432,
+        "sha256": "dd7c43689a4ce454caa57b4f8fa901722498517ef398a2dedc76e5af6c6d6523"
+      },
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "60ad086f7cf5452bb43337a44e60c76fa42324b81206c99735ebdfb740489d67"
+      },
+      {
+        "path": "ffn-512.mlpackage/Manifest.json",
+        "bytes": 617,
+        "sha256": "ab048fea810328ccea6bd14c044b2ce76011ce4c7dcc49253b45b99894c049f6"
+      },
+      {
+        "path": "ffn-512.mlmodelc/analytics/coremldata.bin",
+        "bytes": 243,
+        "sha256": "5f0d016383c995b8b9fb19afa50e7817de41b9e594d10f169291cde0c40de181"
+      },
+      {
+        "path": "ffn-512.mlmodelc/coremldata.bin",
+        "bytes": 391,
+        "sha256": "17f368a33e0360844f8036a248582e5b10711aa73de3ba881fdae3a7ecb92180"
+      },
+      {
+        "path": "ffn-512.mlmodelc/model.mil",
+        "bytes": 15946,
+        "sha256": "d8d407c62f3625dac89d9f321889dcfeff21b3cb002e536d67425d28b1fecff2"
+      },
+      {
+        "path": "ffn-512.mlmodelc/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "60ad086f7cf5452bb43337a44e60c76fa42324b81206c99735ebdfb740489d67"
+      }
+    ]
+  },
+  {
+    "assets": "${HOME}/qwen38-survey-20261029/layer44/b8",
+    "files": [
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+        "bytes": 15432,
+        "sha256": "f1440bf17405da683c2fd6d2163d4b151a5fdff0bfec98a00d4e4a1980ee7494"
+      },
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "c17302960318ed216c130f17e0b442570b74c72706d9748d0a3762bbcf1ae015"
+      },
+      {
+        "path": "ffn-512.mlpackage/Manifest.json",
+        "bytes": 617,
+        "sha256": "bcb3a85029052abd78f443c08e123c896a9340cf6bf36989d6103b8974b62a69"
+      },
+      {
+        "path": "ffn-512.mlmodelc/analytics/coremldata.bin",
+        "bytes": 243,
+        "sha256": "bbacef6c408a56e30f6baa79b481eec03e7914ed411f38f05bb391e5a0b3a6ae"
+      },
+      {
+        "path": "ffn-512.mlmodelc/coremldata.bin",
+        "bytes": 391,
+        "sha256": "2c1d9d77cd11d86f49f0fbc2ea9c43aaca080d09b8e059d201ed269db480f304"
+      },
+      {
+        "path": "ffn-512.mlmodelc/model.mil",
+        "bytes": 15946,
+        "sha256": "d8d407c62f3625dac89d9f321889dcfeff21b3cb002e536d67425d28b1fecff2"
+      },
+      {
+        "path": "ffn-512.mlmodelc/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "c17302960318ed216c130f17e0b442570b74c72706d9748d0a3762bbcf1ae015"
+      }
+    ]
+  },
+  {
+    "assets": "${HOME}/qwen38-survey-20261029/layer45/b8",
+    "files": [
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+        "bytes": 15432,
+        "sha256": "5d122e9f379577f08d783bd8487496f3aa093c816180c98686f88c22fb6d5bc9"
+      },
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "a8c0b0ccd8f78f10110a8ae632fcfe5b65f4baf7c3da5a5c101e2358553908fc"
+      },
+      {
+        "path": "ffn-512.mlpackage/Manifest.json",
+        "bytes": 617,
+        "sha256": "d1e32ff6727192abf0dcc8c82c86a4062f9b510f35dcdf7ca6f44e89670fe0c7"
+      },
+      {
+        "path": "ffn-512.mlmodelc/analytics/coremldata.bin",
+        "bytes": 243,
+        "sha256": "30ebd5da469fd04ff659a91641049853b0c2d937f76e6d0f1999fd2005a83bd9"
+      },
+      {
+        "path": "ffn-512.mlmodelc/coremldata.bin",
+        "bytes": 391,
+        "sha256": "7523b5f1248da6c1a6a1f57e50995ec744c3decece37bd540e18c56db94c202b"
+      },
+      {
+        "path": "ffn-512.mlmodelc/model.mil",
+        "bytes": 15946,
+        "sha256": "d8d407c62f3625dac89d9f321889dcfeff21b3cb002e536d67425d28b1fecff2"
+      },
+      {
+        "path": "ffn-512.mlmodelc/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "a8c0b0ccd8f78f10110a8ae632fcfe5b65f4baf7c3da5a5c101e2358553908fc"
+      }
+    ]
+  },
+  {
+    "assets": "${HOME}/qwen38-survey-20261029/layer48/b8",
+    "files": [
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+        "bytes": 15432,
+        "sha256": "2a229db09e310a90719392cb3804ae5afe845e26becb87b48e8bd0fd1b07c18a"
+      },
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "b03953ab1618c69c4d73918b119d1d624b45faef94d65bc2399b850a07c52e19"
+      },
+      {
+        "path": "ffn-512.mlpackage/Manifest.json",
+        "bytes": 617,
+        "sha256": "0a44ada9ba865feb1364c14bcca55de14d5c0dfb9a1792698f7bdb0003f031a8"
+      },
+      {
+        "path": "ffn-512.mlmodelc/analytics/coremldata.bin",
+        "bytes": 243,
+        "sha256": "81befa6dd7edbc95237b784525906bd3ca94dd9c61117b3433661b5f845a79f2"
+      },
+      {
+        "path": "ffn-512.mlmodelc/coremldata.bin",
+        "bytes": 391,
+        "sha256": "f128868d95983c23f5ff3afb3bd88d710af3f4a1a37c84a1f17bbd2bb021699e"
+      },
+      {
+        "path": "ffn-512.mlmodelc/model.mil",
+        "bytes": 15946,
+        "sha256": "d8d407c62f3625dac89d9f321889dcfeff21b3cb002e536d67425d28b1fecff2"
+      },
+      {
+        "path": "ffn-512.mlmodelc/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "b03953ab1618c69c4d73918b119d1d624b45faef94d65bc2399b850a07c52e19"
+      }
+    ]
+  },
+  {
+    "assets": "${HOME}/qwen38-survey-20261029/layer49/b8",
+    "files": [
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+        "bytes": 15432,
+        "sha256": "a0dc39d46dfd296d0935e0dffaad7d3f30a59001715d98af3cc989a41a53299b"
+      },
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "86055d965c206b89d0587f01d897881ad2079a3b848c031b0002e8c5b4a385fe"
+      },
+      {
+        "path": "ffn-512.mlpackage/Manifest.json",
+        "bytes": 617,
+        "sha256": "69ce2b5c18c407f887e28d36da7a858da7c82953355f3b1b7f09a940dfedcfca"
+      },
+      {
+        "path": "ffn-512.mlmodelc/analytics/coremldata.bin",
+        "bytes": 243,
+        "sha256": "37dfa030554f6b1957701c28d344607615d503e3310453524dc42fb258fbc044"
+      },
+      {
+        "path": "ffn-512.mlmodelc/coremldata.bin",
+        "bytes": 391,
+        "sha256": "d3e5827fa020c6f6ad63e9bf7bff12044b58911d2abca33d79ab84e230b7070b"
+      },
+      {
+        "path": "ffn-512.mlmodelc/model.mil",
+        "bytes": 15946,
+        "sha256": "d8d407c62f3625dac89d9f321889dcfeff21b3cb002e536d67425d28b1fecff2"
+      },
+      {
+        "path": "ffn-512.mlmodelc/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "86055d965c206b89d0587f01d897881ad2079a3b848c031b0002e8c5b4a385fe"
+      }
+    ]
+  },
+  {
+    "assets": "${HOME}/qwen38-survey-20261029/layer50/b8",
+    "files": [
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+        "bytes": 15432,
+        "sha256": "843602aab8b6003a5293ae6a086a69d5513b2d5735f632bdb924a94b27703f44"
+      },
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "b2f83d144e285bd8d3833619cf28bf85e9e406d023e4c5fb7b91583bd1634149"
+      },
+      {
+        "path": "ffn-512.mlpackage/Manifest.json",
+        "bytes": 617,
+        "sha256": "30fea86235b823450d286f76d42b9b09fbaac3acdbfa02120e8a6a51541e7f97"
+      },
+      {
+        "path": "ffn-512.mlmodelc/analytics/coremldata.bin",
+        "bytes": 243,
+        "sha256": "eaa2c9947efdd7f0435c74ab81ac720841f02c8a2907327312f58534730b8193"
+      },
+      {
+        "path": "ffn-512.mlmodelc/coremldata.bin",
+        "bytes": 391,
+        "sha256": "d3da6db3037f7b514e7417b53cbc54e2ea41f96cfe40489f6cfd6bcae3f2d1ab"
+      },
+      {
+        "path": "ffn-512.mlmodelc/model.mil",
+        "bytes": 15946,
+        "sha256": "d8d407c62f3625dac89d9f321889dcfeff21b3cb002e536d67425d28b1fecff2"
+      },
+      {
+        "path": "ffn-512.mlmodelc/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "b2f83d144e285bd8d3833619cf28bf85e9e406d023e4c5fb7b91583bd1634149"
+      }
+    ]
+  },
+  {
+    "assets": "${HOME}/qwen38-survey-20261029/layer52/b8",
+    "files": [
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+        "bytes": 15432,
+        "sha256": "e4086e197845996a2172304471ea9d46e2724297cdd598ff5909aac3aae935b2"
+      },
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "9c8c34fa9e29bf7b3f2d07e8fd97c276a7df37006956dbe074326a89b0e0fab3"
+      },
+      {
+        "path": "ffn-512.mlpackage/Manifest.json",
+        "bytes": 617,
+        "sha256": "36e16039ab7b336d0e3ce0a3dd56309208d46abfc2f9d22953f17bb90b2e7e79"
+      },
+      {
+        "path": "ffn-512.mlmodelc/analytics/coremldata.bin",
+        "bytes": 243,
+        "sha256": "d92fb319f1528731e1e1e37e5d33ef052376284cc335a6169eb75b3c8138d177"
+      },
+      {
+        "path": "ffn-512.mlmodelc/coremldata.bin",
+        "bytes": 391,
+        "sha256": "e1a36e50e900a32f9fcdb6e8fd354bd096fb3af4a70119ec639e5317473800c2"
+      },
+      {
+        "path": "ffn-512.mlmodelc/model.mil",
+        "bytes": 15946,
+        "sha256": "d8d407c62f3625dac89d9f321889dcfeff21b3cb002e536d67425d28b1fecff2"
+      },
+      {
+        "path": "ffn-512.mlmodelc/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "9c8c34fa9e29bf7b3f2d07e8fd97c276a7df37006956dbe074326a89b0e0fab3"
+      }
+    ]
+  },
+  {
+    "assets": "${HOME}/qwen38-survey-20261029/layer53/b8",
+    "files": [
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+        "bytes": 15432,
+        "sha256": "7c7f37474654082da97ce42405dcf0bd3fece55673194c9c831d1f68818b04a5"
+      },
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "98be33edd66cebfef24d73a32cc724c7af49f5db0ccdb655233bb109bdf2e50a"
+      },
+      {
+        "path": "ffn-512.mlpackage/Manifest.json",
+        "bytes": 617,
+        "sha256": "59f8dbb239dab903eabaad474992ecb1e3aa0e7b0c9fda57280cc44b17aa1855"
+      },
+      {
+        "path": "ffn-512.mlmodelc/analytics/coremldata.bin",
+        "bytes": 243,
+        "sha256": "522640135ba332df84e05f7350a377b8a66ff7b7aa2afda7727933a848b7ba7b"
+      },
+      {
+        "path": "ffn-512.mlmodelc/coremldata.bin",
+        "bytes": 391,
+        "sha256": "7f632e78e45e0896f741b63ff3baacfd6a24066de2b80be76e63d85b0caf9b7a"
+      },
+      {
+        "path": "ffn-512.mlmodelc/model.mil",
+        "bytes": 15946,
+        "sha256": "d8d407c62f3625dac89d9f321889dcfeff21b3cb002e536d67425d28b1fecff2"
+      },
+      {
+        "path": "ffn-512.mlmodelc/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "98be33edd66cebfef24d73a32cc724c7af49f5db0ccdb655233bb109bdf2e50a"
+      }
+    ]
+  },
+  {
+    "assets": "${HOME}/qwen38-survey-20261029/layer56/b8",
+    "files": [
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+        "bytes": 15432,
+        "sha256": "c96e3bb816d57eecfbb3221df7de53e6568c3ba863cfad047d451b64b74ffa5a"
+      },
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "e32c04c90d67629a1d67a9c4b7374d4c07533e27c17504223eb1da8bfcfbda3d"
+      },
+      {
+        "path": "ffn-512.mlpackage/Manifest.json",
+        "bytes": 617,
+        "sha256": "55cc2db6dd075d6c7b0d8a632870c29b577af4d5f6040e341a4a3682ba4b9556"
+      },
+      {
+        "path": "ffn-512.mlmodelc/analytics/coremldata.bin",
+        "bytes": 243,
+        "sha256": "8671db02d4de94eeeb94fa680c3fb00ca3d8e8e0ea264ce70191db4b79095470"
+      },
+      {
+        "path": "ffn-512.mlmodelc/coremldata.bin",
+        "bytes": 391,
+        "sha256": "d8fce01a057c385a111a1615e681b7bfd70d30947e864a2e8e84345819386e09"
+      },
+      {
+        "path": "ffn-512.mlmodelc/model.mil",
+        "bytes": 15946,
+        "sha256": "d8d407c62f3625dac89d9f321889dcfeff21b3cb002e536d67425d28b1fecff2"
+      },
+      {
+        "path": "ffn-512.mlmodelc/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "e32c04c90d67629a1d67a9c4b7374d4c07533e27c17504223eb1da8bfcfbda3d"
+      }
+    ]
+  },
+  {
+    "assets": "${HOME}/qwen38-survey-20261029/layer57/b8",
+    "files": [
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+        "bytes": 15432,
+        "sha256": "9505d7cde4d551be0389415e2de54b8aa588367889eb6f7630c1b3c213f20d91"
+      },
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "77ab64504201a9c2104541c11cb8c17420b2200df57f834ea2b58278344ad583"
+      },
+      {
+        "path": "ffn-512.mlpackage/Manifest.json",
+        "bytes": 617,
+        "sha256": "396d43c3c5fafcad8e28b94edabb6e63a3607973127dad246185744df537943b"
+      },
+      {
+        "path": "ffn-512.mlmodelc/analytics/coremldata.bin",
+        "bytes": 243,
+        "sha256": "6c4307cde073cc3617790ce011c4aa028d7d28eca4d656e495a32f93f80efb7a"
+      },
+      {
+        "path": "ffn-512.mlmodelc/coremldata.bin",
+        "bytes": 391,
+        "sha256": "aaef8d44bea300b2cf700156e46d4625c8a1f2aa1d4ef33ed316d2a9489f750d"
+      },
+      {
+        "path": "ffn-512.mlmodelc/model.mil",
+        "bytes": 15946,
+        "sha256": "d8d407c62f3625dac89d9f321889dcfeff21b3cb002e536d67425d28b1fecff2"
+      },
+      {
+        "path": "ffn-512.mlmodelc/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "77ab64504201a9c2104541c11cb8c17420b2200df57f834ea2b58278344ad583"
+      }
+    ]
+  },
+  {
+    "assets": "${HOME}/qwen38-survey-20261029/layer58/b8",
+    "files": [
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+        "bytes": 15432,
+        "sha256": "1cbcd10307479c4997e0da4d41311b4a5af63600ad75fd6b1bbc2d89f7fe9051"
+      },
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "8ac6252221b98fb161e94f3a87e1fdb958ed371f28bd37fc47b7d1cdb2a99cdd"
+      },
+      {
+        "path": "ffn-512.mlpackage/Manifest.json",
+        "bytes": 617,
+        "sha256": "ca4c5afb0ac622cdacfa3261448e239a001a82996d0b687c753fe0025bb16b7d"
+      },
+      {
+        "path": "ffn-512.mlmodelc/analytics/coremldata.bin",
+        "bytes": 243,
+        "sha256": "5b4fcf50be7efc37ef718c9007a968d9771546f0e49beac0d3932d1e5e50ee57"
+      },
+      {
+        "path": "ffn-512.mlmodelc/coremldata.bin",
+        "bytes": 391,
+        "sha256": "84392d72960d1f7c7583d63a883459d09c097183135117b58304029cd408bc5a"
+      },
+      {
+        "path": "ffn-512.mlmodelc/model.mil",
+        "bytes": 15946,
+        "sha256": "d8d407c62f3625dac89d9f321889dcfeff21b3cb002e536d67425d28b1fecff2"
+      },
+      {
+        "path": "ffn-512.mlmodelc/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "8ac6252221b98fb161e94f3a87e1fdb958ed371f28bd37fc47b7d1cdb2a99cdd"
+      }
+    ]
+  },
+  {
+    "assets": "${HOME}/qwen38-survey-20261029/layer60/b8",
+    "files": [
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+        "bytes": 15432,
+        "sha256": "9bbd718d8cddead5294314540dbe145df323b351ccbce9d7b4f19b39473ed3a5"
+      },
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "539a45994407936f7dfc99fe3403a02db7a3ed575ad6bd2929d540615a3b96fd"
+      },
+      {
+        "path": "ffn-512.mlpackage/Manifest.json",
+        "bytes": 617,
+        "sha256": "587f629de344a5b791c64c69bbf6fb554af8f78aff10296635d98e56e74349d5"
+      },
+      {
+        "path": "ffn-512.mlmodelc/analytics/coremldata.bin",
+        "bytes": 243,
+        "sha256": "4da92d1e5f16e2136d9a0c55d13bd39f7ae3ef56d50d0422131872dda3322b78"
+      },
+      {
+        "path": "ffn-512.mlmodelc/coremldata.bin",
+        "bytes": 391,
+        "sha256": "1983e550edd90ad1f1260fcf4dffbf79927a1e6dbeb9f062d7ba686ce47ffc8a"
+      },
+      {
+        "path": "ffn-512.mlmodelc/model.mil",
+        "bytes": 15946,
+        "sha256": "d8d407c62f3625dac89d9f321889dcfeff21b3cb002e536d67425d28b1fecff2"
+      },
+      {
+        "path": "ffn-512.mlmodelc/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "539a45994407936f7dfc99fe3403a02db7a3ed575ad6bd2929d540615a3b96fd"
+      }
+    ]
+  },
+  {
+    "assets": "${HOME}/qwen38-survey-20261029/layer61/b8",
+    "files": [
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/model.mlmodel",
+        "bytes": 15432,
+        "sha256": "7553774d0c85e8bd6a893e1dcfcac48a3204d6546bfba9c395a9e0ee7dbd5fd0"
+      },
+      {
+        "path": "ffn-512.mlpackage/Data/com.apple.CoreML/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "867f02170ffa45a04a08082d53f1da1c86260e0ac0339b5cc41d75a885b5255d"
+      },
+      {
+        "path": "ffn-512.mlpackage/Manifest.json",
+        "bytes": 617,
+        "sha256": "3e4eefbd7d411444cd28f189dffb7f6ef6aef9aeedef01eb64ab72e6d3cf8d10"
+      },
+      {
+        "path": "ffn-512.mlmodelc/analytics/coremldata.bin",
+        "bytes": 243,
+        "sha256": "8b333ae76e6c3cdfb78b8dec148c10e04269f9fd56aba80f58541df411645fac"
+      },
+      {
+        "path": "ffn-512.mlmodelc/coremldata.bin",
+        "bytes": 391,
+        "sha256": "fb87769163107966d6fcba016ef936ac7a118a2244f4863d7b0ff246f633b366"
+      },
+      {
+        "path": "ffn-512.mlmodelc/model.mil",
+        "bytes": 15946,
+        "sha256": "d8d407c62f3625dac89d9f321889dcfeff21b3cb002e536d67425d28b1fecff2"
+      },
+      {
+        "path": "ffn-512.mlmodelc/weights/weight.bin",
+        "bytes": 94381824,
+        "sha256": "867f02170ffa45a04a08082d53f1da1c86260e0ac0339b5cc41d75a885b5255d"
+      }
+    ]
+  }
+]

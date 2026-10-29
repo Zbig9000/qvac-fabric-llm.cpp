@@ -1,0 +1,8 @@
+{
+  "passed": true,
+  "qualified": [
+    "coreml20",
+    "coreml22",
+    "coreml24"
+  ]
+}

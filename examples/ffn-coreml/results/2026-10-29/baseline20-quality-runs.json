@@ -1,0 +1,298 @@
+[
+  {
+    "name": "control",
+    "passed": true,
+    "command": [
+      "${HOME}/qwen38-accuracy-20261029/build-accuracy/llama-coreml-decoder-bench",
+      "/Users/Shared/models/Qwen3.8-27B-UD-Q4_K_XL.gguf",
+      "${HOME}/qwen38-survey-20261029/combined/best8/selection",
+      "quality-metal",
+      "${HOME}/qwen38-parallel-ffn/code.txt",
+      "512,2048",
+      "16",
+      "1",
+      "${HOME}/qwen38-survey-20261029/combined/best8/control"
+    ],
+    "exit_code": 0,
+    "seconds": 25.26244306564331,
+    "quality": [
+      {
+        "prompt_tokens": "512",
+        "mean_kl": "0.000001026",
+        "max_kl": "0.000018574",
+        "top1_agreement": "1.000000000",
+        "metal_nll": "8.403834953",
+        "split_nll": "8.403777737",
+        "metal_ppl": "4464.153780978",
+        "split_ppl": "4463.898367364",
+        "offload_calls": "20",
+        "screen_pass": "1",
+        "reference_custom": "1"
+      },
+      {
+        "prompt_tokens": "2048",
+        "mean_kl": "0.000001085",
+        "max_kl": "0.000020325",
+        "top1_agreement": "0.999511719",
+        "metal_nll": "12.598820929",
+        "split_nll": "12.598900802",
+        "metal_ppl": "296209.107686293",
+        "split_ppl": "296232.767933936",
+        "offload_calls": "80",
+        "screen_pass": "1",
+        "reference_custom": "1"
+      }
+    ]
+  },
+  {
+    "name": "code",
+    "passed": true,
+    "command": [
+      "${HOME}/qwen38-accuracy-20261029/build-accuracy/llama-coreml-decoder-bench",
+      "/Users/Shared/models/Qwen3.8-27B-UD-Q4_K_XL.gguf",
+      "${HOME}/qwen38-survey-20261029/combined/best8/selection",
+      "quality",
+      "${HOME}/qwen38-parallel-ffn/code.txt",
+      "512,2048",
+      "16",
+      "1",
+      "${HOME}/qwen38-survey-20261029/combined/best8/code"
+    ],
+    "exit_code": 0,
+    "seconds": 40.03700590133667,
+    "quality": [
+      {
+        "prompt_tokens": "512",
+        "mean_kl": "0.000455716",
+        "max_kl": "0.025044462",
+        "top1_agreement": "0.992187500",
+        "metal_nll": "8.403834953",
+        "split_nll": "8.392921282",
+        "metal_ppl": "4464.153780978",
+        "split_ppl": "4415.698372849",
+        "offload_calls": "20",
+        "screen_pass": "1",
+        "reference_custom": "0"
+      },
+      {
+        "prompt_tokens": "2048",
+        "mean_kl": "0.000775301",
+        "max_kl": "0.076625546",
+        "top1_agreement": "0.990234375",
+        "metal_nll": "12.598820929",
+        "split_nll": "12.581768487",
+        "metal_ppl": "296209.107686293",
+        "split_ppl": "291200.841921362",
+        "offload_calls": "80",
+        "screen_pass": "1",
+        "reference_custom": "0"
+      }
+    ]
+  },
+  {
+    "name": "prose",
+    "passed": true,
+    "command": [
+      "${HOME}/qwen38-accuracy-20261029/build-accuracy/llama-coreml-decoder-bench",
+      "/Users/Shared/models/Qwen3.8-27B-UD-Q4_K_XL.gguf",
+      "${HOME}/qwen38-survey-20261029/combined/best8/selection",
+      "quality",
+      "${HOME}/qwen38-parallel-ffn/prose.txt",
+      "512,2048",
+      "16",
+      "1",
+      "${HOME}/qwen38-survey-20261029/combined/best8/prose"
+    ],
+    "exit_code": 0,
+    "seconds": 40.06450915336609,
+    "quality": [
+      {
+        "prompt_tokens": "512",
+        "mean_kl": "0.000153916",
+        "max_kl": "0.006909764",
+        "top1_agreement": "0.998046875",
+        "metal_nll": "1.612528618",
+        "split_nll": "1.603652081",
+        "metal_ppl": "5.015477432",
+        "split_ppl": "4.971154370",
+        "offload_calls": "20",
+        "screen_pass": "1",
+        "reference_custom": "0"
+      },
+      {
+        "prompt_tokens": "2048",
+        "mean_kl": "0.000083425",
+        "max_kl": "0.007199557",
+        "top1_agreement": "0.998046875",
+        "metal_nll": "0.572902640",
+        "split_nll": "0.569670867",
+        "metal_ppl": "1.773407150",
+        "split_ppl": "1.767685151",
+        "offload_calls": "80",
+        "screen_pass": "1",
+        "reference_custom": "0"
+      }
+    ]
+  },
+  {
+    "name": "math",
+    "passed": true,
+    "command": [
+      "${HOME}/qwen38-accuracy-20261029/build-accuracy/llama-coreml-decoder-bench",
+      "/Users/Shared/models/Qwen3.8-27B-UD-Q4_K_XL.gguf",
+      "${HOME}/qwen38-survey-20261029/combined/best8/selection",
+      "quality",
+      "${HOME}/qwen38-parallel-ffn/math.txt",
+      "512,2048",
+      "16",
+      "1",
+      "${HOME}/qwen38-survey-20261029/combined/best8/math"
+    ],
+    "exit_code": 0,
+    "seconds": 40.70267415046692,
+    "quality": [
+      {
+        "prompt_tokens": "512",
+        "mean_kl": "0.000144752",
+        "max_kl": "0.003461784",
+        "top1_agreement": "0.998046875",
+        "metal_nll": "3.889052588",
+        "split_nll": "3.884349881",
+        "metal_ppl": "48.864569703",
+        "split_ppl": "48.635313414",
+        "offload_calls": "20",
+        "screen_pass": "1",
+        "reference_custom": "0"
+      },
+      {
+        "prompt_tokens": "2048",
+        "mean_kl": "0.000445367",
+        "max_kl": "0.143382920",
+        "top1_agreement": "0.997070312",
+        "metal_nll": "3.046959460",
+        "split_nll": "3.039952192",
+        "metal_ppl": "21.051239872",
+        "split_ppl": "20.904243812",
+        "offload_calls": "80",
+        "screen_pass": "1",
+        "reference_custom": "0"
+      }
+    ]
+  },
+  {
+    "name": "build-guide",
+    "passed": true,
+    "command": [
+      "${HOME}/qwen38-accuracy-20261029/build-accuracy/llama-coreml-decoder-bench",
+      "/Users/Shared/models/Qwen3.8-27B-UD-Q4_K_XL.gguf",
+      "${HOME}/qwen38-survey-20261029/combined/best8/selection",
+      "quality",
+      "${HOME}/qwen38-accuracy-20261029/heldout/build-guide.txt",
+      "512,2048,8192",
+      "16",
+      "1",
+      "${HOME}/qwen38-survey-20261029/combined/best8/build-guide"
+    ],
+    "exit_code": 0,
+    "seconds": 111.4527440071106,
+    "quality": [
+      {
+        "prompt_tokens": "512",
+        "mean_kl": "0.000054282",
+        "max_kl": "0.001849932",
+        "top1_agreement": "0.996093750",
+        "metal_nll": "1.108172027",
+        "split_nll": "1.108744526",
+        "metal_ppl": "3.028816735",
+        "split_ppl": "3.030551228",
+        "offload_calls": "20",
+        "screen_pass": "1",
+        "reference_custom": "0"
+      },
+      {
+        "prompt_tokens": "2048",
+        "mean_kl": "0.000072919",
+        "max_kl": "0.005716400",
+        "top1_agreement": "0.997558594",
+        "metal_nll": "1.318917821",
+        "split_nll": "1.318926693",
+        "metal_ppl": "3.739372517",
+        "split_ppl": "3.739405692",
+        "offload_calls": "80",
+        "screen_pass": "1",
+        "reference_custom": "0"
+      },
+      {
+        "prompt_tokens": "8192",
+        "mean_kl": "0.000047364",
+        "max_kl": "0.005716400",
+        "top1_agreement": "0.997436523",
+        "metal_nll": "1.239588630",
+        "split_nll": "1.239718007",
+        "metal_ppl": "3.454192222",
+        "split_ppl": "3.454639143",
+        "offload_calls": "320",
+        "screen_pass": "1",
+        "reference_custom": "0"
+      }
+    ]
+  },
+  {
+    "name": "schema-code",
+    "passed": true,
+    "command": [
+      "${HOME}/qwen38-accuracy-20261029/build-accuracy/llama-coreml-decoder-bench",
+      "/Users/Shared/models/Qwen3.8-27B-UD-Q4_K_XL.gguf",
+      "${HOME}/qwen38-survey-20261029/combined/best8/selection",
+      "quality",
+      "${HOME}/qwen38-accuracy-20261029/heldout/schema-code.txt",
+      "512,2048,8192",
+      "16",
+      "1",
+      "${HOME}/qwen38-survey-20261029/combined/best8/schema-code"
+    ],
+    "exit_code": 0,
+    "seconds": 103.72179102897644,
+    "quality": [
+      {
+        "prompt_tokens": "512",
+        "mean_kl": "0.000009465",
+        "max_kl": "0.000193788",
+        "top1_agreement": "0.998046875",
+        "metal_nll": "0.629150233",
+        "split_nll": "0.629266403",
+        "metal_ppl": "1.876015725",
+        "split_ppl": "1.876233674",
+        "offload_calls": "20",
+        "screen_pass": "1",
+        "reference_custom": "0"
+      },
+      {
+        "prompt_tokens": "2048",
+        "mean_kl": "0.000006965",
+        "max_kl": "0.000193788",
+        "top1_agreement": "0.999511719",
+        "metal_nll": "0.393677161",
+        "split_nll": "0.393661483",
+        "metal_ppl": "1.482421888",
+        "split_ppl": "1.482398646",
+        "offload_calls": "80",
+        "screen_pass": "1",
+        "reference_custom": "0"
+      },
+      {
+        "prompt_tokens": "8192",
+        "mean_kl": "0.000009571",
+        "max_kl": "0.002322455",
+        "top1_agreement": "0.999633789",
+        "metal_nll": "0.468165737",
+        "split_nll": "0.468148419",
+        "metal_ppl": "1.597062073",
+        "split_ppl": "1.597034415",
+        "offload_calls": "320",
+        "screen_pass": "1",
+        "reference_custom": "0"
+      }
+    ]
+  }
+]

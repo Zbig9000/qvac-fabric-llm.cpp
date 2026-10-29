@@ -1,0 +1,21 @@
+{
+  "generated": 128,
+  "coreml_repetitions": 5,
+  "metal_repetitions_before": 3,
+  "metal_repetitions_after": 3,
+  "lengths": [
+    2048,
+    8192
+  ],
+  "mean_kl_limit": 0.001,
+  "ppl_ratio_limit": 1.01,
+  "expansion22": [
+    45,
+    50
+  ],
+  "expansion24": [
+    44,
+    48
+  ],
+  "compiled_cache_only": true
+}

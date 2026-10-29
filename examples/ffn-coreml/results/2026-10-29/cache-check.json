@@ -1,0 +1,137 @@
+{
+  "passed": true,
+  "runs": [
+    {
+      "command": [
+        "${HOME}/qwen38-overall-20261029/llama-coreml-decoder-bench-cached",
+        "/Users/Shared/models/Qwen3.8-27B-UD-Q4_K_XL.gguf",
+        "${HOME}/qwen38-survey-20261029/combined/best8/selection",
+        "quality",
+        "${HOME}/qwen38-parallel-ffn/code.txt",
+        "512,2048",
+        "16",
+        "1",
+        "${HOME}/qwen38-overall-20261029/cache-check-0/tokens"
+      ],
+      "exit_code": 0,
+      "quality": [
+        {
+          "prompt_tokens": "512",
+          "mean_kl": "0.000455716",
+          "max_kl": "0.025044462",
+          "top1_agreement": "0.992187500",
+          "metal_nll": "8.403834953",
+          "split_nll": "8.392921282",
+          "metal_ppl": "4464.153780978",
+          "split_ppl": "4415.698372849",
+          "offload_calls": "20",
+          "screen_pass": "1",
+          "reference_custom": "0"
+        },
+        {
+          "prompt_tokens": "2048",
+          "mean_kl": "0.000775301",
+          "max_kl": "0.076625546",
+          "top1_agreement": "0.990234375",
+          "metal_nll": "12.598820929",
+          "split_nll": "12.581768487",
+          "metal_ppl": "296209.107686293",
+          "split_ppl": "291200.841921362",
+          "offload_calls": "80",
+          "screen_pass": "1",
+          "reference_custom": "0"
+        }
+      ],
+      "cache": [
+        "decoder_compiled_cache_layer=31 created=1 path=${HOME}/qwen38-survey-20261029/combined/best8/selection/layer31/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=35 created=1 path=${HOME}/qwen38-survey-20261029/combined/best8/selection/layer35/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=39 created=1 path=${HOME}/qwen38-survey-20261029/combined/best8/selection/layer39/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=43 created=1 path=${HOME}/qwen38-survey-20261029/combined/best8/selection/layer43/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=46 created=1 path=${HOME}/qwen38-survey-20261029/combined/best8/selection/layer46/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=47 created=1 path=${HOME}/qwen38-survey-20261029/combined/best8/selection/layer47/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=49 created=1 path=${HOME}/qwen38-survey-20261029/combined/best8/selection/layer49/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=51 created=1 path=${HOME}/qwen38-survey-20261029/combined/best8/selection/layer51/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=52 created=1 path=${HOME}/qwen38-survey-20261029/combined/best8/selection/layer52/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=53 created=1 path=${HOME}/qwen38-survey-20261029/combined/best8/selection/layer53/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=54 created=1 path=${HOME}/qwen38-survey-20261029/combined/best8/selection/layer54/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=55 created=1 path=${HOME}/qwen38-survey-20261029/combined/best8/selection/layer55/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=56 created=1 path=${HOME}/qwen38-survey-20261029/combined/best8/selection/layer56/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=57 created=1 path=${HOME}/qwen38-survey-20261029/combined/best8/selection/layer57/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=58 created=1 path=${HOME}/qwen38-survey-20261029/combined/best8/selection/layer58/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=59 created=1 path=${HOME}/qwen38-survey-20261029/combined/best8/selection/layer59/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=60 created=1 path=${HOME}/qwen38-survey-20261029/combined/best8/selection/layer60/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=61 created=1 path=${HOME}/qwen38-survey-20261029/combined/best8/selection/layer61/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=62 created=1 path=${HOME}/qwen38-survey-20261029/combined/best8/selection/layer62/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=63 created=1 path=${HOME}/qwen38-survey-20261029/combined/best8/selection/layer63/ffn-512.mlmodelc"
+      ],
+      "free_before": 12045955072,
+      "free_after": 10006368256
+    },
+    {
+      "command": [
+        "${HOME}/qwen38-overall-20261029/llama-coreml-decoder-bench-cached",
+        "/Users/Shared/models/Qwen3.8-27B-UD-Q4_K_XL.gguf",
+        "${HOME}/qwen38-survey-20261029/combined/best8/selection",
+        "quality",
+        "${HOME}/qwen38-parallel-ffn/code.txt",
+        "512,2048",
+        "16",
+        "1",
+        "${HOME}/qwen38-overall-20261029/cache-check-1/tokens"
+      ],
+      "exit_code": 0,
+      "quality": [
+        {
+          "prompt_tokens": "512",
+          "mean_kl": "0.000455716",
+          "max_kl": "0.025044462",
+          "top1_agreement": "0.992187500",
+          "metal_nll": "8.403834953",
+          "split_nll": "8.392921282",
+          "metal_ppl": "4464.153780978",
+          "split_ppl": "4415.698372849",
+          "offload_calls": "20",
+          "screen_pass": "1",
+          "reference_custom": "0"
+        },
+        {
+          "prompt_tokens": "2048",
+          "mean_kl": "0.000775301",
+          "max_kl": "0.076625546",
+          "top1_agreement": "0.990234375",
+          "metal_nll": "12.598820929",
+          "split_nll": "12.581768487",
+          "metal_ppl": "296209.107686293",
+          "split_ppl": "291200.841921362",
+          "offload_calls": "80",
+          "screen_pass": "1",
+          "reference_custom": "0"
+        }
+      ],
+      "cache": [
+        "decoder_compiled_cache_layer=31 created=0 path=${HOME}/qwen38-accuracy-20261029/assets/layer31-fp16/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=35 created=0 path=${HOME}/qwen38-extend-20261029/assets/layer35-b8/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=39 created=0 path=${HOME}/qwen38-accuracy-20261029/assets/layer39-b8/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=43 created=0 path=${HOME}/qwen38-accuracy-20261029/assets/layer43-b8/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=46 created=0 path=${HOME}/qwen38-extend-20261029/assets/layer46-b8/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=47 created=0 path=${HOME}/qwen38-decoder-layer47-b8/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=49 created=0 path=${HOME}/qwen38-survey-20261029/layer49/b8/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=51 created=0 path=${HOME}/qwen38-accuracy-20261029/assets/layer51-b8/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=52 created=0 path=${HOME}/qwen38-survey-20261029/layer52/b8/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=53 created=0 path=${HOME}/qwen38-survey-20261029/layer53/b8/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=54 created=0 path=${HOME}/qwen38-extend-20261029/assets/layer54-b8/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=55 created=0 path=${HOME}/qwen38-decoder-layer55-b8/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=56 created=0 path=${HOME}/qwen38-survey-20261029/layer56/b8/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=57 created=0 path=${HOME}/qwen38-survey-20261029/layer57/b8/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=58 created=0 path=${HOME}/qwen38-survey-20261029/layer58/b8/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=59 created=0 path=${HOME}/qwen38-accuracy-20261029/assets/layer59-b8/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=60 created=0 path=${HOME}/qwen38-survey-20261029/layer60/b8/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=61 created=0 path=${HOME}/qwen38-survey-20261029/layer61/b8/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=62 created=0 path=${HOME}/qwen38-extend-20261029/assets/layer62-b8/ffn-512.mlmodelc",
+        "decoder_compiled_cache_layer=63 created=0 path=${HOME}/qwen38-decoder-layer63-b8/ffn-512.mlmodelc"
+      ],
+      "free_before": 10006351872,
+      "free_after": 10005757952
+    }
+  ]
+}

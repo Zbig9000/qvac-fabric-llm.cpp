@@ -1,0 +1,298 @@
+[
+  {
+    "name": "control",
+    "passed": true,
+    "command": [
+      "${HOME}/qwen38-overall-20261029/llama-coreml-decoder-bench-cached",
+      "/Users/Shared/models/Qwen3.8-27B-UD-Q4_K_XL.gguf",
+      "${HOME}/qwen38-overall-20261029/combined/expand22/selection",
+      "quality-metal",
+      "${HOME}/qwen38-parallel-ffn/code.txt",
+      "512,2048",
+      "16",
+      "1",
+      "${HOME}/qwen38-overall-20261029/combined/expand22/control"
+    ],
+    "exit_code": 0,
+    "seconds": 25.24269390106201,
+    "quality": [
+      {
+        "prompt_tokens": "512",
+        "mean_kl": "0.000001568",
+        "max_kl": "0.000056751",
+        "top1_agreement": "1.000000000",
+        "metal_nll": "8.403834953",
+        "split_nll": "8.403688049",
+        "metal_ppl": "4464.153780978",
+        "split_ppl": "4463.498029932",
+        "offload_calls": "22",
+        "screen_pass": "1",
+        "reference_custom": "1"
+      },
+      {
+        "prompt_tokens": "2048",
+        "mean_kl": "0.000002149",
+        "max_kl": "0.000229563",
+        "top1_agreement": "0.999511719",
+        "metal_nll": "12.598820929",
+        "split_nll": "12.598893657",
+        "metal_ppl": "296209.107686293",
+        "split_ppl": "296230.651328799",
+        "offload_calls": "88",
+        "screen_pass": "1",
+        "reference_custom": "1"
+      }
+    ]
+  },
+  {
+    "name": "code",
+    "passed": true,
+    "command": [
+      "${HOME}/qwen38-overall-20261029/llama-coreml-decoder-bench-cached",
+      "/Users/Shared/models/Qwen3.8-27B-UD-Q4_K_XL.gguf",
+      "${HOME}/qwen38-overall-20261029/combined/expand22/selection",
+      "quality",
+      "${HOME}/qwen38-parallel-ffn/code.txt",
+      "512,2048",
+      "16",
+      "1",
+      "${HOME}/qwen38-overall-20261029/combined/expand22/code"
+    ],
+    "exit_code": 0,
+    "seconds": 26.378202199935913,
+    "quality": [
+      {
+        "prompt_tokens": "512",
+        "mean_kl": "0.000513623",
+        "max_kl": "0.022834454",
+        "top1_agreement": "0.988281250",
+        "metal_nll": "8.403834953",
+        "split_nll": "8.387348235",
+        "metal_ppl": "4464.153780978",
+        "split_ppl": "4391.157924564",
+        "offload_calls": "22",
+        "screen_pass": "1",
+        "reference_custom": "0"
+      },
+      {
+        "prompt_tokens": "2048",
+        "mean_kl": "0.000852444",
+        "max_kl": "0.075334927",
+        "top1_agreement": "0.987792969",
+        "metal_nll": "12.598820929",
+        "split_nll": "12.574393446",
+        "metal_ppl": "296209.107686293",
+        "split_ppl": "289061.123795011",
+        "offload_calls": "88",
+        "screen_pass": "1",
+        "reference_custom": "0"
+      }
+    ]
+  },
+  {
+    "name": "prose",
+    "passed": true,
+    "command": [
+      "${HOME}/qwen38-overall-20261029/llama-coreml-decoder-bench-cached",
+      "/Users/Shared/models/Qwen3.8-27B-UD-Q4_K_XL.gguf",
+      "${HOME}/qwen38-overall-20261029/combined/expand22/selection",
+      "quality",
+      "${HOME}/qwen38-parallel-ffn/prose.txt",
+      "512,2048",
+      "16",
+      "1",
+      "${HOME}/qwen38-overall-20261029/combined/expand22/prose"
+    ],
+    "exit_code": 0,
+    "seconds": 25.12954592704773,
+    "quality": [
+      {
+        "prompt_tokens": "512",
+        "mean_kl": "0.000198764",
+        "max_kl": "0.006165387",
+        "top1_agreement": "0.996093750",
+        "metal_nll": "1.612528618",
+        "split_nll": "1.599959725",
+        "metal_ppl": "5.015477432",
+        "split_ppl": "4.952832944",
+        "offload_calls": "22",
+        "screen_pass": "1",
+        "reference_custom": "0"
+      },
+      {
+        "prompt_tokens": "2048",
+        "mean_kl": "0.000105293",
+        "max_kl": "0.008137320",
+        "top1_agreement": "0.997558594",
+        "metal_nll": "0.572902640",
+        "split_nll": "0.567951748",
+        "metal_ppl": "1.773407150",
+        "split_ppl": "1.764648901",
+        "offload_calls": "88",
+        "screen_pass": "1",
+        "reference_custom": "0"
+      }
+    ]
+  },
+  {
+    "name": "math",
+    "passed": true,
+    "command": [
+      "${HOME}/qwen38-overall-20261029/llama-coreml-decoder-bench-cached",
+      "/Users/Shared/models/Qwen3.8-27B-UD-Q4_K_XL.gguf",
+      "${HOME}/qwen38-overall-20261029/combined/expand22/selection",
+      "quality",
+      "${HOME}/qwen38-parallel-ffn/math.txt",
+      "512,2048",
+      "16",
+      "1",
+      "${HOME}/qwen38-overall-20261029/combined/expand22/math"
+    ],
+    "exit_code": 0,
+    "seconds": 25.20741295814514,
+    "quality": [
+      {
+        "prompt_tokens": "512",
+        "mean_kl": "0.000180508",
+        "max_kl": "0.010093646",
+        "top1_agreement": "1.000000000",
+        "metal_nll": "3.889052588",
+        "split_nll": "3.878777687",
+        "metal_ppl": "48.864569703",
+        "split_ppl": "48.365061691",
+        "offload_calls": "22",
+        "screen_pass": "1",
+        "reference_custom": "0"
+      },
+      {
+        "prompt_tokens": "2048",
+        "mean_kl": "0.000510260",
+        "max_kl": "0.167741994",
+        "top1_agreement": "0.996582031",
+        "metal_nll": "3.046959460",
+        "split_nll": "3.030312819",
+        "metal_ppl": "21.051239872",
+        "split_ppl": "20.703708091",
+        "offload_calls": "88",
+        "screen_pass": "1",
+        "reference_custom": "0"
+      }
+    ]
+  },
+  {
+    "name": "build-guide",
+    "passed": true,
+    "command": [
+      "${HOME}/qwen38-overall-20261029/llama-coreml-decoder-bench-cached",
+      "/Users/Shared/models/Qwen3.8-27B-UD-Q4_K_XL.gguf",
+      "${HOME}/qwen38-overall-20261029/combined/expand22/selection",
+      "quality",
+      "${HOME}/qwen38-accuracy-20261029/heldout/build-guide.txt",
+      "512,2048,8192",
+      "16",
+      "1",
+      "${HOME}/qwen38-overall-20261029/combined/expand22/build-guide"
+    ],
+    "exit_code": 0,
+    "seconds": 95.66309094429016,
+    "quality": [
+      {
+        "prompt_tokens": "512",
+        "mean_kl": "0.000059111",
+        "max_kl": "0.001769131",
+        "top1_agreement": "0.996093750",
+        "metal_nll": "1.108172027",
+        "split_nll": "1.108627347",
+        "metal_ppl": "3.028816735",
+        "split_ppl": "3.030196130",
+        "offload_calls": "22",
+        "screen_pass": "1",
+        "reference_custom": "0"
+      },
+      {
+        "prompt_tokens": "2048",
+        "mean_kl": "0.000078566",
+        "max_kl": "0.008080616",
+        "top1_agreement": "0.997558594",
+        "metal_nll": "1.318917821",
+        "split_nll": "1.318853677",
+        "metal_ppl": "3.739372517",
+        "split_ppl": "3.739132665",
+        "offload_calls": "88",
+        "screen_pass": "1",
+        "reference_custom": "0"
+      },
+      {
+        "prompt_tokens": "8192",
+        "mean_kl": "0.000050613",
+        "max_kl": "0.008080616",
+        "top1_agreement": "0.997436523",
+        "metal_nll": "1.239588630",
+        "split_nll": "1.239651465",
+        "metal_ppl": "3.454192222",
+        "split_ppl": "3.454409272",
+        "offload_calls": "352",
+        "screen_pass": "1",
+        "reference_custom": "0"
+      }
+    ]
+  },
+  {
+    "name": "schema-code",
+    "passed": true,
+    "command": [
+      "${HOME}/qwen38-overall-20261029/llama-coreml-decoder-bench-cached",
+      "/Users/Shared/models/Qwen3.8-27B-UD-Q4_K_XL.gguf",
+      "${HOME}/qwen38-overall-20261029/combined/expand22/selection",
+      "quality",
+      "${HOME}/qwen38-accuracy-20261029/heldout/schema-code.txt",
+      "512,2048,8192",
+      "16",
+      "1",
+      "${HOME}/qwen38-overall-20261029/combined/expand22/schema-code"
+    ],
+    "exit_code": 0,
+    "seconds": 95.87438917160034,
+    "quality": [
+      {
+        "prompt_tokens": "512",
+        "mean_kl": "0.000010248",
+        "max_kl": "0.000265086",
+        "top1_agreement": "1.000000000",
+        "metal_nll": "0.629150233",
+        "split_nll": "0.629205072",
+        "metal_ppl": "1.876015725",
+        "split_ppl": "1.876118608",
+        "offload_calls": "22",
+        "screen_pass": "1",
+        "reference_custom": "0"
+      },
+      {
+        "prompt_tokens": "2048",
+        "mean_kl": "0.000007790",
+        "max_kl": "0.000302135",
+        "top1_agreement": "1.000000000",
+        "metal_nll": "0.393677161",
+        "split_nll": "0.393636374",
+        "metal_ppl": "1.482421888",
+        "split_ppl": "1.482361425",
+        "offload_calls": "88",
+        "screen_pass": "1",
+        "reference_custom": "0"
+      },
+      {
+        "prompt_tokens": "8192",
+        "mean_kl": "0.000010434",
+        "max_kl": "0.002437530",
+        "top1_agreement": "0.999511719",
+        "metal_nll": "0.468165737",
+        "split_nll": "0.468141620",
+        "metal_ppl": "1.597062073",
+        "split_ppl": "1.597023557",
+        "offload_calls": "352",
+        "screen_pass": "1",
+        "reference_custom": "0"
+      }
+    ]
+  }
+]

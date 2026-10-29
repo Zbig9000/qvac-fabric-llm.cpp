@@ -1,0 +1,18 @@
+[
+  {
+    "path": "${HOME}/qwen38-accuracy-20261029/build-accuracy/llama-coreml-decoder-bench",
+    "sha256": "a0538d175d55edbbb7916a870c88142031b6f138675fb31ded58545795bfe526"
+  },
+  {
+    "path": "${HOME}/qwen38-accuracy-20261029/build-accuracy/bin/libggml-metal.dylib",
+    "sha256": "c117c48ca41ce7a03749903e22c694f51d65a7b5acdc9c0e977ab38eeb511a5e"
+  },
+  {
+    "path": "${HOME}/qwen38-accuracy-20261029/examples/ffn-coreml/export_ffn.py",
+    "sha256": "77ba2bba411ec05ce112120c19fac9a22791fb4668ed90a610cc4f220e2b4476"
+  },
+  {
+    "path": "${HOME}/qwen38-accuracy-20261029/examples/ffn-coreml/palettize_ffn.py",
+    "sha256": "c340b775a35290c88640993f3f2cde99f0c3a0e19a547725556bab301635416a"
+  }
+]

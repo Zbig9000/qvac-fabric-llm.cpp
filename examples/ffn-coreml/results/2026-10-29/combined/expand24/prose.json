@@ -1,0 +1,43 @@
+{
+  "command": [
+    "${HOME}/qwen38-overall-20261029/llama-coreml-decoder-bench-cached",
+    "/Users/Shared/models/Qwen3.8-27B-UD-Q4_K_XL.gguf",
+    "${HOME}/qwen38-overall-20261029/combined/expand24/selection",
+    "quality",
+    "${HOME}/qwen38-parallel-ffn/prose.txt",
+    "512,2048",
+    "16",
+    "1",
+    "${HOME}/qwen38-overall-20261029/combined/expand24/prose"
+  ],
+  "exit_code": 0,
+  "seconds": 25.35668110847473,
+  "quality": [
+    {
+      "prompt_tokens": "512",
+      "mean_kl": "0.000185681",
+      "max_kl": "0.005706943",
+      "top1_agreement": "0.998046875",
+      "metal_nll": "1.612528618",
+      "split_nll": "1.602352916",
+      "metal_ppl": "5.015477432",
+      "split_ppl": "4.964700213",
+      "offload_calls": "24",
+      "screen_pass": "1",
+      "reference_custom": "0"
+    },
+    {
+      "prompt_tokens": "2048",
+      "mean_kl": "0.000106462",
+      "max_kl": "0.010165444",
+      "top1_agreement": "0.998046875",
+      "metal_nll": "0.572902640",
+      "split_nll": "0.568196595",
+      "metal_ppl": "1.773407150",
+      "split_ppl": "1.765081023",
+      "offload_calls": "96",
+      "screen_pass": "1",
+      "reference_custom": "0"
+    }
+  ]
+}

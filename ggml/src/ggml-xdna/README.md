@@ -73,7 +73,7 @@ path for a model the fused design does cover.
 | `SSM_CONV`, from 64 tokens | `kernels/conv.py` | opt-in, `GGML_XDNA_CONV=1`; the host is cheaper and is what runs otherwise |
 | the prefill GDN's conv input | `kernels/gdn_conv.py` | opt-in, `GGML_XDNA_GDN_CONV=1`; the host is faster (pp512 1900 against 1680 t/s on the 0.8B) and is what runs otherwise |
 | `GATED_DELTA_NET`, from 144 tokens a sequence | `kernels/gdn_mm.py` | on, `GGML_XDNA_GDN_MM=0` for the host; below 144 the host is quicker at less energy a token |
-| `FLASH_ATTN_EXT`, above 512 x 512 (token, key) pairs a call | `kernels/attn_mm.py` | on, `GGML_XDNA_FA_MM=0` for the host; up to that the host is quicker at no more energy a token |
+| `FLASH_ATTN_EXT` of 2 KV heads and D = 256, from 8M visible (query, key, head) triples a call | `kernels/attn_mm.py` | on, `GGML_XDNA_FA_MM=0` for the host, `=2` for the array whatever the size; below that the host is quicker: a call pays two hardware-context switches (~5 ms) |
 
 ### Everything else
 
@@ -98,9 +98,15 @@ Q8_0 and BF16 files) runs without a model-specific path:
   repacked to the 8-bit form with one extra rounding of the codes, and the
   `BF16` `per_layer_model_proj` through the bf16 GEMM. In the BF16 file the
   `output` projection (N 768) is not a multiple of 512 and stays on the host.
-- Attention, the norms, RoPE, GEGLU and the mean pooling are host glue. The
-  prefill attention kernel is causal with 256-wide heads, and this model's
-  attention is bidirectional, with a sliding window on most layers.
+- The norms, RoPE, GEGLU and the mean pooling are host glue. So is the
+  attention up to ~2300 tokens. The prefill attention kernel takes the 20
+  sliding-window layers (4 query heads over 2 KV heads of 256, a window and
+  the packed sequence, scale 1), but each call pays two hardware-context
+  switches (~5 ms, the projections around it are another xclbin), which the
+  host's ~2.6 ms a layer at 912 tokens does not repay. Past the break-even
+  the array takes those layers: a 3200-token Q8_0 input runs 4% faster, 4097
+  tokens 3% and 6138 tokens 9%. The four full-attention layers (heads of 512,
+  one KV head) stay on the host, ~5.6 ms each at 912 tokens and 92 ms at 4096.
 - An input of one token runs whole on the host, as the decode of a model
   wider or narrower than the fused layers does. The model's residual width is
   512, not 1024, so the backend logs once that "its decode runs on the host",
@@ -415,7 +421,7 @@ report, not for tuning: every one costs more time or energy than the default.
 | `GGML_XDNA_PGEMM_GLU_A` | the SwiGLU written into the down projection's A |
 | `GGML_XDNA_GDN_MM` | the prefill gated delta rule on the array |
 | `GGML_XDNA_GDN_IN` | the prefill GDN's conv input, norms and state copy fed straight into the array |
-| `GGML_XDNA_FA_MM` | the prefill attention on the array |
+| `GGML_XDNA_FA_MM` | the prefill attention on the array: `0` the host, `2` the array whatever the size |
 
 Diagnostics - nothing is measured unless they are set:
 
@@ -493,6 +499,8 @@ Diagnostics - nothing is measured unless they are set:
 - The device reports itself to the scheduler as an integrated GPU: its buffers
   are host memory, and the free memory it reports is all of system memory, so
   any `--fit` accounting is nominal.
-- A non-causal model's attention (EmbeddingGemma 2) runs on the host: the
-  prefill attention kernel is causal only. Its f16 casts of K and V run on the
-  CPU backend, so the graph splits once per layer.
+- EmbeddingGemma 2's attention runs on the host below ~2300 tokens, and its
+  full-attention layers (heads of 512, one KV head) at any length: the prefill
+  attention kernel takes heads of 256 over 2 KV heads, and each call pays two
+  hardware-context switches. Its f16 casts of K and V run on the CPU backend,
+  so the graph splits once per layer.

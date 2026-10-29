@@ -147,7 +147,7 @@ Enhanced GPU support with targeted optimizations for Qualcomm Adreno GPUs.
 
 ### AMD XDNA (NPU) Backend *(exclusive)*
 
-Offloads GEMM (matrix multiplication) to the AMD XDNA NPU (Ryzen AI, NPU2) via XRT for inference on Strix-class APUs. See [ggml/src/ggml-xdna/README.md](ggml/src/ggml-xdna/README.md) for build and usage instructions.
+Offloads GEMM (matrix multiplication) to the AMD XDNA NPU (Ryzen AI, NPU2) via XRT for inference on Strix-class APUs. Built around Qwen3.5; the EmbeddingGemma 2 embedding model also runs, checked against the CPU by `test-xdna-embedding`. See [ggml/src/ggml-xdna/README.md](ggml/src/ggml-xdna/README.md) for build and usage instructions.
 
 Requires Linux with an NPU2 (XDNA2) device, XRT 2.25.x (installed under `/opt/xilinx/xrt`) and a Python interpreter with mlir-aie (IRON) to compile the kernels at build time. Enable with `-DGGML_XDNA=ON`.
 

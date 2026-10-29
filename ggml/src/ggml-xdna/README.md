@@ -175,7 +175,9 @@ kernel rebuild. A build that does not generate kernels compiles the committed
 
 The `.insts.bin` files are reference copies. The runtime builds its own TXN
 instruction streams in C++ (`xdna-seq.cpp`, `xdna-seq-attn.cpp`,
-`xdna-gemv.cpp`), which is what lets one artifact serve every shape.
+`xdna-gemv.cpp`), which is what lets one artifact serve every shape. The
+prefill GEMM keeps the last 128 streams it built, by what they were built from,
+so a layer or a pass that repeats a shape and its destination only looks one up.
 
 ### Provenance and licences
 

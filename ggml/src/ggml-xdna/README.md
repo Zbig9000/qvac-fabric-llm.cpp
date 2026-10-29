@@ -114,11 +114,13 @@ Q8_0 and BF16 files) runs without a model-specific path:
   mean is set by a few tokens whose KLD is above 1, and which tokens they are
   changes with the rounding, so a run of a few chunks can show either route 2
   to 3 times better than the other.
-- A layer's Q, K and V projections, which follow each other in the graph
-  (`gemma-embedding2.cpp` adds them to it together), run as one prefill GEMM
-  that writes each output into its own node (`GGML_XDNA_PGEMM_GROUP=0`: one
-  GEMM each). All but the last end on a whole 512 columns and every node must
-  lie in one of the backend's buffers.
+- A layer's Q, K and V projections run as one prefill GEMM that writes each
+  output into its own node (`GGML_XDNA_PGEMM_GROUP=0`: one GEMM each). ggml
+  places K's and V's after Q's norm and RoPE, so the backend's
+  `graph_optimize` moves the projections of one activation that can form a
+  group up behind the first, before the scheduler allocates the graph; no model
+  orders its graph for it. All but the last end on a whole 512 columns and
+  every node must lie in one of the backend's buffers.
 - Attention, the norms, RoPE and the mean pooling are host glue. The
   prefill attention kernel is causal with 256-wide heads, and this model's
   attention is bidirectional, with a sliding window on most layers.

@@ -118,11 +118,6 @@ llama_model_gemma_embedding2::graph::graph(const llama_model & model, const llm_
             cb(Kcur, "Kcur", il);
             cb(Vcur, "Vcur", il);
 
-            // the three projections side by side in the graph, for a backend that runs them as one
-            ggml_build_forward_expand(gf, Qcur);
-            ggml_build_forward_expand(gf, Kcur);
-            ggml_build_forward_expand(gf, Vcur);
-
             Qcur = ggml_reshape_3d(ctx0, Qcur, n_embd_head, n_head,    n_tokens);
             Kcur = ggml_reshape_3d(ctx0, Kcur, n_embd_head, n_head_kv, n_tokens);
             Vcur = ggml_reshape_3d(ctx0, Vcur, n_embd_head, n_head_kv, n_tokens);

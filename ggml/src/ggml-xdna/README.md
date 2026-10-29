@@ -136,9 +136,10 @@ model.gguf` checks both, and `scripts/snapdragon/embeddinggemma2_eval.py
 --device XDNA0 --flash-attn on` runs the packing, ordering and CPU-parity
 checks.
 
-Each GEMM dispatch costs ~0.4 ms of fixed overhead, and a Q8_0 pass makes 169
-of them, so the array pays off on long inputs only (Q8_0, the eval driver's
-corpus, CPU at 16 threads):
+A GEMM dispatch costs 0.1 to 0.3 ms at 15 tokens (an empty one still takes
+about 60 us to start and finish), and a Q8_0 pass makes 145 of them, so the
+array pays off on long inputs only (Q8_0, the eval driver's corpus, CPU at 16
+threads):
 
 | input | CPU | XDNA |
 | :-- | --: | --: |

@@ -19,6 +19,7 @@ constexpr int64_t ROWS              = 64;
 constexpr int64_t BATCH             = 32;
 constexpr int     EXECUTION_THREADS = 4;
 constexpr int     MANY_THREADS      = 1024;
+constexpr size_t  SLOT_POINTERS     = 3;
 
 void check(bool passed, const char * message) {
     if (!passed) {
@@ -77,6 +78,22 @@ void check_host(ggml_backend_t cpu) {
     ggml_backend_sched_reset(sched);
     check(ggml_backend_sched_get_host_size(sched) == measured, "reset lost retained host allocations");
     ggml_backend_sched_free(sched);
+}
+
+size_t reserved_host_size(ggml_backend_buffer_type_t * bufts, int count, Probe & probe) {
+    auto * galloc = ggml_gallocr_new_n(bufts, count);
+    check(ggml_gallocr_reserve(galloc, probe.graph), "graph allocator reservation failed");
+    const size_t size = ggml_gallocr_get_host_size(galloc);
+    ggml_gallocr_free(galloc);
+    return size;
+}
+
+void check_shared_buffers(ggml_backend_t cpu, Probe & probe) {
+    ggml_backend_buffer_type_t single[1]   = { ggml_backend_get_default_buffer_type(cpu) };
+    ggml_backend_buffer_type_t repeated[2] = { single[0], single[0] };
+    const size_t               one         = reserved_host_size(single, 1, probe);
+    const size_t               two         = reserved_host_size(repeated, 2, probe);
+    check(two == one + SLOT_POINTERS * sizeof(void *), "repeated buffer type counts its shared buffer twice");
 }
 
 void check_plan(ggml_backend_t cpu, Probe & probe) {
@@ -147,6 +164,7 @@ int main() try {
     check(cpu != nullptr, "CPU backend unavailable");
     check_host(cpu);
     Probe probe;
+    check_shared_buffers(cpu, probe);
     check_plan(cpu, probe);
     check_execution(cpu, cpu);
     ggml_backend_free(cpu);

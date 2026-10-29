@@ -17,10 +17,11 @@
 //
 // BF16 and F16 weight projections, which no quantized route carries, through
 // the bf16 GEMM: an M that fits the decode block, one that takes several
-// prefill blocks and one whose last block is partial; a K of one run, of
-// several and one that ends in a partial run; and, in one graph, projections
-// of different K and N one after the other (the cores hang when consecutive
-// runs differ in their K-loop count).
+// prefill blocks, one whose last block is partial and one whose last block
+// holds fewer rows than a sweep of its kernel (it runs a shorter stream); a K
+// of one run, of several and one that ends in a partial run; and, in one
+// graph, projections of different K and N one after the other (the cores hang
+// when consecutive runs differ in their K-loop count).
 //
 // Every intermediate is cleared before each backend runs, so a node read
 // before it was written shows as zeros instead of as the other backend's
@@ -273,6 +274,7 @@ int main(void) {
         { "decode block",     GGML_TYPE_BF16, 15,  { { 512, 1024 }, { 1024, 512 } } },
         { "two blocks",       GGML_TYPE_BF16, 300, { { 512, 1024 }, { 512, 512 } } },
         { "partial block",    GGML_TYPE_BF16, 912, { { 512, 2048 }, { 512, 512 } } },
+        { "short tail",       GGML_TYPE_BF16, 1100, { { 512, 512 }, { 1024, 512 } } },
         { "mixed K and N",    GGML_TYPE_BF16, 912, { { 512, 1024 }, { 1024, 512 }, { 2048, 512 }, { 576, 1024 }, { 512, 512 } } },
         { "f16 weights",      GGML_TYPE_F16,  130, { { 1536, 512 }, { 512, 2048 } } },
     };

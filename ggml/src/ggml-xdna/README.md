@@ -24,9 +24,18 @@ for the GEMV). The route depends on the number of activation rows `M`:
 | >= 64 | prefill GEMM, the cheapest baked M block; bf16 for `F16`/`BF16`/`Q4_K`, and the native int8 route (1 B/value) for `Q4_K`/`Q5_K`/`Q6_K` |
 
 The GEMM artifacts are compiled at K1024/N2048 but the runtime drives any `K`
-and `N` (the stream builder writes the loop counts per dispatch), so only the
-baked M block is fixed: one artifact per M block. A wide `N` such as the
-vocabulary projection stays on the host.
+that is a multiple of 64 and any `N` that is a multiple of 512 (the stream
+builder writes the loop counts per dispatch), so only the baked M block is
+fixed: one artifact per M block. A wide `N` such as the vocabulary projection
+stays on the host.
+
+The bf16 route takes `K` in runs of 512, and the host adds the partial sums of
+a deeper `K`. The cores read their K-loop count from the stream of each run,
+and a run whose count differs from the previous run's on the same hardware
+context hangs the context, so every run has the same width: a `K` that is not a
+whole number of them ends in a run zero-padded out to 512. A block of A rows
+runs only the sweeps its rows fill (`tile_m` rows on each of the four compute
+rows); each sweep reads the weights from DDR once.
 
 ### The fused decode recurrent layer
 
@@ -96,8 +105,10 @@ Q8_0 and BF16 files) runs without a model-specific path:
 - Its weight projections take the [MUL_MAT](#mul_mat) routes. In the Q8_0
   file they are all on the array: the `Q8_0` weights through the prefill GEMM,
   repacked to the 8-bit form with one extra rounding of the codes, and the
-  `BF16` `per_layer_model_proj` through the bf16 GEMM. In the BF16 file the
-  `output` projection (N 768) is not a multiple of 512 and stays on the host.
+  `BF16` `per_layer_model_proj` through the bf16 GEMM. In the BF16 file every
+  projection but `output` is on the array: its N is 768, not a multiple of
+  512, and zero-padded to 1024 columns it measured no faster than the host's
+  16 threads and lowered the pooled cosine by 2e-5 to 6e-5.
 - The norms, RoPE, GEGLU and the mean pooling are host glue. So is the
   attention up to ~2300 tokens. The prefill attention kernel takes the 20
   sliding-window layers (4 query heads over 2 KV heads of 256, a window and

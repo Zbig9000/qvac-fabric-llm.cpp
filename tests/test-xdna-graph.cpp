@@ -28,7 +28,8 @@
 // backend runs the gate and up projections and the activation as one call,
 // writing the product straight into the down projection's input; with the
 // GLU a graph output it writes the product itself. Activations are scaled
-// to put the gate on the activation's curve and, larger, in its tails.
+// to put the gate on the activation's curve and, larger, in its tails. Two
+// sizes: EmbeddingGemma 2's (512, 2048) and Qwen3.5-4B's (2560, 9216).
 //
 // Every intermediate is cleared before each backend runs, so a node read
 // before it was written shows as zeros instead of as the other backend's
@@ -283,8 +284,8 @@ static bool test_repeated_projection(ggml_backend_t npu, ggml_backend_t cpu, int
 }
 
 // x (K x M) through a gate and an up projection of F rows, joined by `op`
-static norm_graph build_ffn(ggml_backend_t be, ggml_glu_op op, bool glu_is_output, int64_t M, float scale) {
-    const int64_t K = 512, F = 2048;
+static norm_graph build_ffn(ggml_backend_t be, ggml_glu_op op, bool glu_is_output, int64_t K, int64_t F, int64_t M,
+                            float scale) {
     norm_graph    g;
     ggml_init_params ip = { ggml_tensor_overhead() * 16 + ggml_graph_overhead(), nullptr, true };
     g.ctx               = ggml_init(ip);
@@ -314,16 +315,17 @@ static norm_graph build_ffn(ggml_backend_t be, ggml_glu_op op, bool glu_is_outpu
     return g;
 }
 
-static bool test_ffn(ggml_backend_t npu, ggml_backend_t cpu, ggml_glu_op op, bool glu_is_output, int64_t M, float scale,
-                     double tol) {
-    norm_graph                      want_g = build_ffn(cpu, op, glu_is_output, M, scale);
-    norm_graph                      got_g  = build_ffn(npu, op, glu_is_output, M, scale);
+static bool test_ffn(ggml_backend_t npu, ggml_backend_t cpu, ggml_glu_op op, bool glu_is_output, int64_t K, int64_t F,
+                     int64_t M, float scale, double tol) {
+    norm_graph                      want_g = build_ffn(cpu, op, glu_is_output, K, F, M, scale);
+    norm_graph                      got_g  = build_ffn(npu, op, glu_is_output, K, F, M, scale);
     std::vector<std::vector<float>> want, got;
     const bool                      ok = run(want_g, cpu, want) && run(got_g, npu, got);
     const double                    e  = ok ? nmse(want[0], got[0]) : INFINITY;
     const bool                      passed = ok && e < tol;
-    std::printf("%-6s %-4s M %-4lld scale %-5.2f nmse %.3g %s\n", op == GGML_GLU_OP_GEGLU ? "GEGLU" : "SWIGLU",
-                glu_is_output ? "glu" : "down", (long long) M, scale, e, passed ? "ok" : "FAIL");
+    std::printf("%-6s %-4s K %-5lld F %-5lld M %-4lld scale %-5.2f nmse %.3g %s\n",
+                op == GGML_GLU_OP_GEGLU ? "GEGLU" : "SWIGLU", glu_is_output ? "glu" : "down", (long long) K,
+                (long long) F, (long long) M, scale, e, passed ? "ok" : "FAIL");
     ggml_backend_buffer_free(want_g.buf);
     ggml_backend_buffer_free(got_g.buf);
     ggml_free(want_g.ctx);
@@ -456,7 +458,8 @@ int main(void) {
     for (ggml_glu_op op : { GGML_GLU_OP_SWIGLU, GGML_GLU_OP_GEGLU }) {
         for (bool glu_is_output : { false, true }) {
             for (float scale : { 0.05f, 0.3f }) {
-                passed = test_ffn(npu, cpu, op, glu_is_output, 200, scale, 3e-3) && passed;
+                passed = test_ffn(npu, cpu, op, glu_is_output, 512, 2048, 200, scale, 3e-3) && passed;
+                passed = test_ffn(npu, cpu, op, glu_is_output, 2560, 9216, 300, scale, 3e-3) && passed;
             }
         }
     }

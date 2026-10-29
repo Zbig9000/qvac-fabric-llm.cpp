@@ -106,7 +106,14 @@ Q8_0 and BF16 files) runs without a model-specific path:
   the GEGLU (the tanh-approximated GELU of the gate times the up) and write the
   down projection's input in bf16, so the activation never goes to the host
   (`GGML_XDNA_PGEMM_GLU=0` and `GGML_XDNA_PGEMM_GLU_A=0` turn the two steps
-  off).
+  off). The activation is evaluated at bf16 level, which is what the down
+  projection reads of it anyway. Qwen3.5-4B-Q8_0's prefill KLD against the CPU
+  with and without the fold differs by less than the standard error (100 chunks
+  of 512 tokens: 0.00513 +- 0.00080 and 0.00496 +- 0.00075; 12 chunks of 2048:
+  0.00646 +- 0.00116 and 0.00605 +- 0.00088), the median by 2 to 3%. In both the
+  mean is set by a few tokens whose KLD is above 1, and which tokens they are
+  changes with the rounding, so a run of a few chunks can show either route 2
+  to 3 times better than the other.
 - A layer's Q, K and V projections, which follow each other in the graph
   (`gemma-embedding2.cpp` adds them to it together), run as one prefill GEMM
   that writes each output into its own node (`GGML_XDNA_PGEMM_GROUP=0`: one

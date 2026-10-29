@@ -25,9 +25,9 @@
 
 // --- GEMM internals (static) ------------------------------------------------
 
-// The int8 route splits K into blocks of at most GEMM_K_MAX (the bf16 route's
-// runs are GEMM_K_RUN wide): a per-core K-loop count above 64 (K > 1024 with
-// tile_k=16) wedges the shared hw_context. GEMM_N_MAX is a
+// The int8 route splits K into blocks of GEMM_K_MAX and zero-pads a short one,
+// so the per-core K-loop count (K / tile_k) never changes between its runs on
+// the shared hw_context; GEMM_K_RUN below gives the reason. GEMM_N_MAX is a
 // practical cap on N: wide projections (e.g. the vocabulary output) need a
 // huge B transpose and run too long on the NPU.
 static const int GEMM_K_MAX     = 1024;
@@ -698,7 +698,7 @@ static void gemm_fold_row(const float * c, float * dst, int N, bool accumulate) 
 }
 
 // Read the first mc rows of a finished C block into dst (rows dst_ld floats
-// apart), the first K block of an op by assignment and the others added. False
+// apart), the first K run of an op by assignment and the others added. False
 // when the device's write to a run of rows did not land.
 static bool gemm_fold_c(xdna_buffer * bo_c, int mc, int N, float * dst, int64_t dst_ld, bool accumulate) {
     const size_t row_bytes = (size_t) N * sizeof(float);
@@ -778,7 +778,8 @@ static void gemm_drop_pending(xdna_ops * ops) {
 // of K), src1 = activations [K, M] (stored as M rows of K), so dst[M, N] =
 // src1^T @ src0. src1's memory feeds the kernel directly as A [M, K]; src0's
 // memory is transposed to B [K, N]. The stream is built per shape via
-// xdna_gemm_seq_build, so only A's rows are padded to the baked M block.
+// xdna_gemm_seq_build, so only A's rows are padded, to whole sweeps of the
+// baked M block.
 //
 // Submission is pipelined: two A/C buffer banks are ping-ponged. The run for
 // block (m0, k0) is submitted without waiting, then the previous block's run
@@ -799,7 +800,7 @@ static bool gemm_compute(xdna_ops * ops, struct ggml_tensor * node) {
     const xdna_gemm_tiles & tiles = geom.tiles;
     const int               Mk    = tiles.M;  // baked M block of the selected geometry
 
-    // B is a persistent BO with the packed [K x N] weights; each K-block's
+    // B is a persistent BO with the packed [K x N] weights; each K run's
     // stream points into it via its K offset, so no per-call weight copy.
     xdna_buffer * bo_w = gemm_weight_bo(ops, src0, K, N);
     if (!bo_w) {

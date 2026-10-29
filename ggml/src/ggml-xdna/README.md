@@ -98,6 +98,10 @@ Q8_0 and BF16 files) runs without a model-specific path:
   repacked to the 8-bit form with one extra rounding of the codes, and the
   `BF16` `per_layer_model_proj` through the bf16 GEMM. In the BF16 file the
   `output` projection (N 768) is not a multiple of 512 and stays on the host.
+- The prefill GEMM writes its result straight into the `MUL_MAT` node, in
+  whole blocks of 128 rows, so the backend's host buffer type reports those
+  rows in the node's allocation size (`get_alloc_size`) and no row is copied
+  out of a staging buffer. With `GGML_XDNA_HOST_BO=0` the staging stays.
 - Attention, the norms, RoPE, GEGLU and the mean pooling are host glue. The
   prefill attention kernel is causal with 256-wide heads, and this model's
   attention is bidirectional, with a sliding window on most layers.

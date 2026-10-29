@@ -143,8 +143,9 @@ corpus, CPU at 16 threads):
 | eight texts, 1188 tokens, one batch | 444 ms | 364 ms |
 | one 18-33 token query | 7-16 ms | ~100 ms |
 
-The BF16 file is slower on the array (829 ms against 389 ms for the eight
-texts). For short queries, run on the CPU (`--device none`).
+The BF16 file is still slower on the array in time and cheaper in energy: one
+912-token text takes 263 ms and 15.4 J per pass against the CPU's 196 ms and
+17.5 J. For short queries, run on the CPU (`--device none`).
 
 ## How it works
 

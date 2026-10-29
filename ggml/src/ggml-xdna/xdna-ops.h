@@ -93,9 +93,10 @@ struct xdna_ops {
     // pending_run is one (M-block, K-block) submission.
     struct pending_run {
         xrt::run      run;
-        xdna_buffer * bo_c   = nullptr;  // held until readback
-        xdna_buffer * bo_a   = nullptr;  // released after readback
-        int           mb_idx = 0;        // index into pending_op::m_blocks
+        xdna_buffer * bo_c       = nullptr;  // held until readback
+        xdna_buffer * bo_a       = nullptr;  // released after readback
+        int           mb_idx     = 0;        // index into pending_op::m_blocks
+        bool          accumulate = false;    // adds to dst: not the op's first K block
     };
 
     struct pending_m_block {
@@ -113,6 +114,11 @@ struct xdna_ops {
     };
 
     std::vector<pending_op> pending;
+
+    // The bound kernel of each GEMM stream by shape, so a repeated shape does
+    // not build its stream again.
+    std::unordered_map<std::string, xdna_kernel *> gemm_kernel;
+    std::mutex                                     gemm_kernel_mutex;
 
     // Decode GEMV runners, keyed by the first weight of the dispatch. The
     // packed weights live in the runner's device buffer for the process

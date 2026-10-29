@@ -20,7 +20,8 @@
 // query heads with packed sequences, K and V cast to f16 - computed on the
 // array and on the CPU backend. The array answers to ~2e-4 NMSE and the host
 // path bit for bit, so the two are told apart: a mask the design cannot follow,
-// or a call too small, has to come out equal.
+// or a call too small (the size rule, tried either side of both its bounds),
+// has to come out equal.
 //
 // Every intermediate is cleared before each backend runs, so a node read
 // before it was written shows as zeros instead of as the other backend's
@@ -36,6 +37,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <random>
+#include <string>
 #include <vector>
 
 static ggml_backend_dev_t xdna_device(void) {
@@ -175,8 +177,12 @@ static norm_graph build_one_token(ggml_backend_t cpu, int64_t K, int64_t N) {
 
 enum fa_mask { FA_CAUSAL, FA_FULL, FA_BAND, FA_HOLES };
 
+// GGML_XDNA_FA_MM: the host, the array from the size rule's bound, the array whatever the size
+enum fa_route { FA_ROUTE_HOST = 0, FA_ROUTE_BY_SIZE = 1, FA_ROUTE_ARRAY = 2 };
+
 struct fa_case {
     const char * name;
+    fa_route     route;
     int          heads;
     int          n_tokens;
     int          n_ctx;       // keys of earlier context before the tokens (causal)
@@ -288,6 +294,10 @@ static void set_fa_inputs(norm_graph & g, const fa_case & c) {
     }
 }
 
+static void set_fa_route(fa_route route) {
+    setenv("GGML_XDNA_FA_MM", std::to_string((int) route).c_str(), 1);
+}
+
 static bool run_fa(norm_graph & g, const fa_case & c, ggml_backend_t be, std::vector<float> & res) {
     ggml_backend_buffer_clear(g.buf, 0);
     set_fa_inputs(g, c);
@@ -355,21 +365,28 @@ int main(void) {
     }
     unsetenv("GGML_XDNA_FUSED_LAYER");
 
-    // the size rule is not under test here: run the array whatever the size
-    setenv("GGML_XDNA_FA_MM", "2", 1);
+    // the cases that are not about the size rule force the array (or the host), whatever the size; the
+    // by-size cases sit either side of its two bounds: n_tokens x n_kv x n_head, then the visible keys x n_head
     const fa_case fa_cases[] = {
-        // name                              heads tokens ctx   pad seqs mask       window scale   cache  array
-        { "causal 8 heads, cache view",       8, 1536,    0,  256,  1, FA_CAUSAL,   0, 0.0625f, true,  true },
-        { "causal with 1100 keys of context", 8,  600, 1100,  256,  1, FA_CAUSAL,   0, 0.0625f, true,  true },
-        { "bidirectional, 3 sequences",       4,  777,    0,    1,  3, FA_FULL,     0, 1.0f,    false, true },
-        { "band 512, 2 sequences",            4, 1300,    0,    1,  2, FA_BAND,   512, 1.0f,    false, true },
-        { "band 40, one sequence",            4,  900,    0,    1,  1, FA_BAND,    40, 1.0f,    false, true },
-        { "40 sequences of 16 tokens",        4,  640,    0,    1, 40, FA_FULL,     0, 1.0f,    false, true },
-        { "2 heads per KV head group, causal", 2, 700,    0,    1,  1, FA_CAUSAL,   0, 0.0625f, false, true },
-        { "below 64 tokens: the host",        4,   40,    0,    1,  1, FA_FULL,     0, 1.0f,    false, false },
-        { "a mask with holes: the host",      4,  700,    0,    1,  1, FA_HOLES,    0, 1.0f,    false, false },
+        // name                                       route               heads tokens   ctx  pad seqs mask       window scale   cache  array
+        { "causal 8 heads, cache view",               FA_ROUTE_ARRAY,        8, 1536,    0, 256,  1, FA_CAUSAL,   0, 0.0625f, true,  true },
+        { "causal with 1100 keys of context",         FA_ROUTE_ARRAY,        8,  600, 1100, 256,  1, FA_CAUSAL,   0, 0.0625f, true,  true },
+        { "bidirectional, 3 sequences",               FA_ROUTE_ARRAY,        4,  777,    0,   1,  3, FA_FULL,     0, 1.0f,    false, true },
+        { "band 512, 2 sequences",                    FA_ROUTE_ARRAY,        4, 1300,    0,   1,  2, FA_BAND,   512, 1.0f,    false, true },
+        { "band 40, one sequence",                    FA_ROUTE_ARRAY,        4,  900,    0,   1,  1, FA_BAND,    40, 1.0f,    false, true },
+        { "40 sequences of 16 tokens",                FA_ROUTE_ARRAY,        4,  640,    0,   1, 40, FA_FULL,     0, 1.0f,    false, true },
+        { "1 head per KV head group, causal",         FA_ROUTE_ARRAY,        2,  700,    0,   1,  1, FA_CAUSAL,   0, 0.0625f, false, true },
+        { "below 64 tokens: the host",                FA_ROUTE_ARRAY,        4,   40,    0,   1,  1, FA_FULL,     0, 1.0f,    false, false },
+        { "a mask with holes: the host",              FA_ROUTE_ARRAY,        4,  700,    0,   1,  1, FA_HOLES,    0, 1.0f,    false, false },
+        { "FA_MM=0: the host at any size",            FA_ROUTE_HOST,         4, 1600,    0,   1,  1, FA_FULL,     0, 1.0f,    false, false },
+        { "by size: under the shape bound",           FA_ROUTE_BY_SIZE,      4,  700,    0,   1,  1, FA_FULL,     0, 1.0f,    false, false },
+        { "by size: over it, few keys visible",       FA_ROUTE_BY_SIZE,      4, 1600,    0,   1,  1, FA_BAND,    40, 1.0f,    false, false },
+        { "by size: over both bounds",                FA_ROUTE_BY_SIZE,      4, 1600,    0,   1,  1, FA_FULL,     0, 1.0f,    false, true },
+        { "by size: 8 heads, 1100 keys of context",   FA_ROUTE_BY_SIZE,      8,  600, 1100, 256,  1, FA_CAUSAL,   0, 0.0625f, true,  false },
+        { "by size: 8 heads, 1500 keys of context",   FA_ROUTE_BY_SIZE,      8,  600, 1500, 256,  1, FA_CAUSAL,   0, 0.0625f, true,  true },
     };
     for (const fa_case & c : fa_cases) {
+        set_fa_route(c.route);
         norm_graph               g = build_fa(cpu, c);
         std::vector<float>       want, got;
         if (!run_fa(g, c, cpu, want) || !run_fa(g, c, npu, got)) {
@@ -379,7 +396,7 @@ int main(void) {
         const double e  = nmse(want, got);
         const bool   ok = c.on_array ? e > 0.0 && e < 1e-3 : e == 0.0;
         passed          = passed && ok;
-        std::printf("FLASH_ATTN_EXT %-34s nmse %.3g %s\n", c.name, e, ok ? "ok" : "FAIL");
+        std::printf("FLASH_ATTN_EXT %-42s nmse %.3g %s\n", c.name, e, ok ? "ok" : "FAIL");
         ggml_backend_buffer_free(g.buf);
         ggml_free(g.ctx);
     }

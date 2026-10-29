@@ -294,6 +294,23 @@ pass_tiles tiles_of_pass(const mask_rows & mr, const geometry & geo, int64_t n_t
     return { lo / NK, hi / NK + 1 };
 }
 
+std::vector<pass_tiles> tiles_of_passes(const mask_rows & mr, const geometry & geo, int64_t n_tokens, int npass) {
+    std::vector<pass_tiles> passes((size_t) npass);
+    for (int p = 0; p < npass; p++) {
+        passes[p] = tiles_of_pass(mr, geo, n_tokens, p);
+    }
+    return passes;
+}
+
+// One past the last tile any pass streams: what a layer's K/V copy must hold.
+int64_t tiles_reached(const std::vector<pass_tiles> & passes) {
+    int64_t reached = 0;
+    for (const pass_tiles & pt : passes) {
+        reached = std::max(reached, pt.tile_hi);
+    }
+    return reached;
+}
+
 xdna_bd linear_bd(uint32_t words) {
     xdna_bd bd;
     bd.buf_len   = words;
@@ -403,6 +420,17 @@ void pack_kv(const ggml_tensor * k,
             }
         }
     }
+}
+
+// Tiles [t0, t1) of each of the 4 K/V streams to the device.
+bool sync_kv_tiles(xdna_buffer * bo, int64_t cap_tiles, int64_t t0, int64_t t1) {
+    for (int s = 0; s < 4; s++) {
+        if (!xdna_buffer_sync_to_device_range(bo, (size_t) (t1 - t0) * KV_OBJ * 2,
+                                              ((size_t) s * cap_tiles + t0) * KV_OBJ * 2)) {
+            return false;
+        }
+    }
+    return true;
 }
 
 // The scale the host puts into Q, as the exponent of 2 a score is: 1 / sqrt(D)
@@ -577,12 +605,9 @@ bool xdna_attn_mm_run(xdna_kernel_pool * pool, ggml_tensor * node) {
     // the keys before the ubatch's own: the cache's context
     const int64_t     p0    = std::max<int64_t>(0, n_kv - n_tokens);
     const int         npass = (int) ((n_tokens + geo.pass - 1) / geo.pass);
-    std::vector<pass_tiles> passes((size_t) npass);
-    int64_t                 t_need = 0;
-    for (int p = 0; p < npass; p++) {
-        passes[p] = tiles_of_pass(mr, geo, n_tokens, p);
-        t_need    = std::max(t_need, passes[p].tile_hi);
-    }
+
+    const std::vector<pass_tiles> passes = tiles_of_passes(mr, geo, n_tokens, npass);
+    const int64_t                 t_need = tiles_reached(passes);
 
     if (!g_am.kern) {
         g_am.kern = xdna_kernel_find(pool->device, STEM);
@@ -618,11 +643,8 @@ bool xdna_attn_mm_run(xdna_kernel_pool * pool, ggml_tensor * node) {
     {
         xdna_prof::section_timer st("prefill: attn kv pack");
         pack_kv(k, v, kvh, kc.cap_tiles, j0, n_kv);
-        for (int s = 0; s < 4; s++) {
-            if (!xdna_buffer_sync_to_device_range(kc.bo, (size_t) (t1 - t0) * KV_OBJ * 2,
-                                                  ((size_t) s * kc.cap_tiles + t0) * KV_OBJ * 2)) {
-                return false;
-            }
+        if (!sync_kv_tiles(kc.bo, kc.cap_tiles, t0, t1)) {
+            return false;
         }
     }
     kc.packed = n_kv;

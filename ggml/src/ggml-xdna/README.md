@@ -109,10 +109,33 @@ Q8_0 and BF16 files) runs without a model-specific path:
   projection but `output` is on the array: its N is 768, not a multiple of
   512, and zero-padded to 1024 columns it measured no faster than the host's
   16 threads and lowered the pooled cosine by 2e-5 to 6e-5.
-- The norms, RoPE, GEGLU and the mean pooling are host glue. So is the
-  attention up to ~2300 tokens. The prefill attention kernel takes the 20
-  sliding-window layers (4 query heads over 2 KV heads of 256, a window and
-  the packed sequence, scale 1), but each call pays two hardware-context
+- The prefill GEMM writes its result straight into the `MUL_MAT` node, in
+  whole blocks of 128 rows, so the backend's host buffer type reports those
+  rows in the node's allocation size (`get_alloc_size`) and no row is copied
+  out of a staging buffer. With `GGML_XDNA_HOST_BO=0` the staging stays.
+- The FFN's gate and up projections run as one prefill GEMM whose cores apply
+  the GEGLU (the tanh-approximated GELU of the gate times the up) and write the
+  down projection's input in bf16, so the activation never goes to the host
+  (`GGML_XDNA_PGEMM_GLU=0` and `GGML_XDNA_PGEMM_GLU_A=0` turn the two steps
+  off). The activation is evaluated at bf16 level, which is what the down
+  projection reads of it anyway. Qwen3.5-4B-Q8_0's prefill KLD against the CPU
+  with and without the fold differs by less than the standard error (100 chunks
+  of 512 tokens: 0.00513 +- 0.00080 and 0.00496 +- 0.00075; 12 chunks of 2048:
+  0.00646 +- 0.00116 and 0.00605 +- 0.00088), the median by 2 to 3%. In both the
+  mean is set by a few tokens whose KLD is above 1, and which tokens they are
+  changes with the rounding, so a run of a few chunks can show either route 2
+  to 3 times better than the other.
+- A layer's Q, K and V projections run as one prefill GEMM that writes each
+  output into its own node (`GGML_XDNA_PGEMM_GROUP=0`: one GEMM each). ggml
+  places K's and V's after Q's norm and RoPE, so the backend's
+  `graph_optimize` moves the projections of one activation that can form a
+  group up behind the first, before the scheduler allocates the graph; no model
+  orders its graph for it. All but the last end on a whole 512 columns and
+  every node must lie in one of the backend's buffers.
+- The norms, RoPE, the mean pooling and, in the BF16 file, the GEGLU are host
+  glue. So is the attention up to ~2300 tokens. The prefill attention kernel
+  takes the 20 sliding-window layers (4 query heads over 2 KV heads of 256, a
+  window and the packed sequence, scale 1), but each call pays two hardware-context
   switches (~5 ms, the projections around it are another xclbin), which the
   host's ~2.6 ms a layer at 912 tokens does not repay. Past the break-even
   the array takes those layers: a 3200-token Q8_0 input runs 4% faster, 4097
@@ -139,9 +162,10 @@ model.gguf` checks both, and `scripts/snapdragon/embeddinggemma2_eval.py
 --device XDNA0 --flash-attn on` runs the packing, ordering and CPU-parity
 checks.
 
-Each GEMM dispatch costs ~0.4 ms of fixed overhead, and a Q8_0 pass makes 169
-of them, so the array pays off on long inputs only (Q8_0, the eval driver's
-corpus, CPU at 16 threads):
+A GEMM dispatch costs 0.1 to 0.3 ms at 15 tokens (an empty one still takes
+about 60 us to start and finish), and a Q8_0 pass makes 145 of them, so the
+array pays off on long inputs only (Q8_0, the eval driver's corpus, CPU at 16
+threads):
 
 | input | CPU | XDNA |
 | :-- | --: | --: |
@@ -179,7 +203,9 @@ kernel rebuild. A build that does not generate kernels compiles the committed
 
 The `.insts.bin` files are reference copies. The runtime builds its own TXN
 instruction streams in C++ (`xdna-seq.cpp`, `xdna-seq-attn.cpp`,
-`xdna-gemv.cpp`), which is what lets one artifact serve every shape.
+`xdna-gemv.cpp`), which is what lets one artifact serve every shape. The
+prefill GEMM keeps the last 128 streams it built, by what they were built from,
+so a layer or a pass that repeats a shape and its destination only looks one up.
 
 ### Provenance and licences
 
@@ -429,8 +455,9 @@ report, not for tuning: every one costs more time or energy than the default.
 | `GGML_XDNA_PGEMM_NORM_A` | the RMS norm written into the next GEMM's A |
 | `GGML_XDNA_PGEMM_GATED_A` | a recurrent layer's gated output written into the output projection's A |
 | `GGML_XDNA_PGEMM_GATE_A` | the attention gate written into the output projection's A |
-| `GGML_XDNA_PGEMM_GLU` | the SwiGLU computed from the gate and up GEMMs on the array |
-| `GGML_XDNA_PGEMM_GLU_A` | the SwiGLU written into the down projection's A |
+| `GGML_XDNA_PGEMM_GLU` | the SwiGLU or GeGLU computed from the gate and up GEMMs on the array |
+| `GGML_XDNA_PGEMM_GLU_A` | the SwiGLU or GeGLU written into the down projection's A |
+| `GGML_XDNA_PGEMM_GROUP` | consecutive projections of one activation (Q, K and V) run as one GEMM, each output into its own node |
 | `GGML_XDNA_GDN_MM` | the prefill gated delta rule on the array |
 | `GGML_XDNA_GDN_IN` | the prefill GDN's conv input, norms and state copy fed straight into the array |
 | `GGML_XDNA_FA_MM` | the prefill attention on the array: `0` the host, `2` the array whatever the size |
@@ -487,7 +514,7 @@ Diagnostics - nothing is measured unless they are set:
 | `xdna-att-layer.h/.cpp` | a full-attention decode layer as one dispatch of the fused design |
 | `xdna-att.h/.cpp` | the decode attention on the fused design's GEMV pool |
 | `xdna-head.h/.cpp` | the decode's vocabulary projection on the pool, with its exact and 4-bit rows |
-| `xdna-pgemm.h/.cpp` | the prefill GEMM in the decode GEMV's weight tiles, and what it folds in (norm, SwiGLU, gate into A) |
+| `xdna-pgemm.h/.cpp` | the prefill GEMM in the decode GEMV's weight tiles, and what it folds in (norm, SwiGLU or GeGLU, gate into A) and the projections it runs as one |
 | `xdna-attn-mm.h/.cpp` | the prefill attention on the array |
 | `xdna-gdn-mm.h/.cpp` | the prefill gated delta rule on the array, and the GDN input it is fed |
 | `xdna-conv-prefill.h/.cpp` | SSM_CONV prefill runner (opt-in) |
